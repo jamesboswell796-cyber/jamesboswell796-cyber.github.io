@@ -1,0 +1,164 @@
+/* MenubarX Web V0.2.0: responsive full workspace, no overlay drawer. */
+html, body {
+  min-width: 360px;
+  min-height: 320px;
+}
+
+html[data-runtime="web"] [data-runtime-only="chrome"] { display: none !important; }
+
+.workspace-surface {
+  --rail-width:28px;
+  --drawer-width:clamp(132px,24vw,232px);
+  --drawer-column:0px;
+  grid-template-columns:var(--rail-width) var(--drawer-column) minmax(0,1fr);
+  transition:grid-template-columns 130ms ease;
+}
+.workspace-surface.is-drawer-open { --drawer-column:var(--drawer-width); }
+
+.workspace-rail {
+  position:relative;
+  height:100%;
+  padding:7px 0 6px;
+}
+.rail-group { gap:4px; }
+.rail-button,
+.rail-button.rail-note-step {
+  width:24px;
+  height:24px;
+  display:grid;
+  border-radius:8px;
+}
+.rail-button svg { width:15px; height:15px; }
+.rail-separator { display:block; width:13px; }
+.rail-version { width:28px; font-size:7px; }
+
+.workspace-drawer {
+  position:relative;
+  height:100%;
+  min-width:0;
+  max-width:100%;
+}
+.drawer-panel { width:100%; min-width:0; }
+.drawer-header { min-height:58px; padding:13px 9px 9px 12px; }
+.drawer-header strong { font-size:15px; }
+.drawer-header-actions { gap:2px; }
+.small-icon-button { width:25px; height:25px; border-radius:8px; font-size:16px; }
+.search-field { min-height:34px; margin:0 8px 8px; padding:0 7px; grid-template-columns:17px minmax(0,1fr) auto; }
+.search-field input { font-size:11px; }
+.note-list { padding:0 6px 12px; }
+.note-row { gap:3px; padding:8px 7px; border-radius:9px; }
+.note-row-title { font-size:11px; }
+.note-row-excerpt { font-size:9px; -webkit-line-clamp:2; }
+.trash-toggle { min-height:34px; padding:0 10px; }
+.trash-panel { max-height:184px; }
+
+.editor-main {
+  min-width:0;
+  padding:clamp(10px,2.2vw,24px) clamp(10px,2.8vw,30px) clamp(12px,2.6vw,28px);
+}
+.editor-toolbar,
+.markdown-toolbar-full,
+.editor-card { max-width:980px; }
+.editor-toolbar { min-width:0; min-height:42px; gap:10px; margin-bottom:6px; }
+.title-group { min-width:0; flex:1; }
+.active-title { width:100%; max-width:620px; font-size:clamp(15px,1.8vw,18px); }
+.toolbar-actions { flex:0 0 auto; }
+.markdown-toolbar-full {
+  min-width:0;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:none;
+  white-space:nowrap;
+}
+.markdown-toolbar-full::-webkit-scrollbar { display:none; }
+.editor-card { min-width:0; }
+.rich-editor {
+  padding:clamp(24px,5vw,40px) clamp(20px,7vw,88px) clamp(48px,8vw,72px);
+}
+.rich-editor[data-empty="true"]::before {
+  top:clamp(24px,5vw,40px);
+  left:clamp(20px,7vw,88px);
+}
+
+.settings-dialog { width:min(650px,calc(100vw - 24px)); max-height:calc(100vh - 24px); }
+.settings-panel { max-height:calc(100vh - 28px); padding:clamp(14px,2.8vw,20px); }
+.settings-section { grid-template-columns:minmax(0,1fr) minmax(210px,310px); }
+.backup-section,
+.snapshot-section { grid-template-columns:1fr; }
+.snapshot-list { grid-column:auto; }
+
+.note-list,
+.trash-list,
+.snapshot-list,
+.settings-panel,
+.rich-editor {
+  scrollbar-width:thin;
+  scrollbar-color:rgba(100,101,101,.42) transparent;
+}
+.note-list::-webkit-scrollbar,
+.trash-list::-webkit-scrollbar,
+.snapshot-list::-webkit-scrollbar,
+.settings-panel::-webkit-scrollbar,
+.rich-editor::-webkit-scrollbar { width:3px; height:3px; }
+.note-list::-webkit-scrollbar-thumb,
+.trash-list::-webkit-scrollbar-thumb,
+.snapshot-list::-webkit-scrollbar-thumb,
+.settings-panel::-webkit-scrollbar-thumb,
+.rich-editor::-webkit-scrollbar-thumb { border-radius:999px; background:rgba(100,101,101,.42); }
+
+.pip-document .workspace-surface {
+  --rail-width:28px;
+  --drawer-width:clamp(132px,34vw,210px);
+  --drawer-column:0px;
+  grid-template-columns:var(--rail-width) var(--drawer-column) minmax(0,1fr);
+}
+.pip-document .workspace-surface.is-drawer-open { --drawer-column:var(--drawer-width); }
+.pip-document .workspace-rail,
+.pip-document .workspace-drawer { position:relative; height:100%; }
+
+@media (max-width:880px) {
+  .workspace-surface { --drawer-width:clamp(144px,25vw,196px); }
+  .editor-main { padding-left:12px; padding-right:12px; }
+  .settings-section,
+  .appearance-settings-section { grid-template-columns:1fr; }
+  .appearance-settings-grid { max-width:340px; }
+}
+
+@media (max-width:560px) {
+  .workspace-surface { --drawer-width:clamp(132px,32vw,160px); }
+  .drawer-header { min-height:52px; padding:10px 6px 7px 9px; }
+  .drawer-header strong { font-size:13px; }
+  .drawer-count { display:none; }
+  .search-field { margin:0 5px 6px; padding:0 5px; grid-template-columns:15px minmax(0,1fr); }
+  .search-shortcut { display:none; }
+  .note-list { padding:0 4px 8px; }
+  .note-row { padding:7px 6px; }
+  .note-row-excerpt { display:none; }
+  .editor-main { padding:8px 8px 10px; }
+  .editor-toolbar { min-height:39px; margin-bottom:4px; }
+  .toolbar-actions button { min-height:28px; padding:0 7px; font-size:10px; }
+  .markdown-toolbar-full { height:36px; margin-bottom:7px; padding:3px 6px; }
+  .markdown-toolbar-full button { min-width:26px; width:26px; }
+  .markdown-toolbar-full .markdown-block-picker select { min-width:68px; width:68px; }
+  .editor-card { border-radius:13px; }
+  .rich-editor { padding:22px clamp(14px,5vw,28px) 46px; font-size:15px; line-height:1.72; }
+  .rich-editor[data-empty="true"]::before { top:22px; left:clamp(14px,5vw,28px); }
+  .rich-editor h1 { font-size:29px; }
+  .rich-editor h2 { font-size:22px; }
+  .rich-editor h3 { font-size:18px; }
+  .undo-toast { left:calc(var(--rail-width) + 8px); bottom:8px; }
+  .workspace-surface.is-drawer-open .undo-toast { left:calc(var(--rail-width) + var(--drawer-width) + 8px); }
+}
+
+@media (max-width:430px) {
+  .workspace-surface { --drawer-width:clamp(124px,34vw,144px); }
+  .rail-button,
+  .rail-button.rail-note-step { width:23px; height:23px; }
+  .drawer-header-actions { flex-direction:column; }
+  .small-icon-button { width:22px; height:22px; }
+  .active-title { font-size:14px; }
+  .save-status { font-size:8px; }
+  .settings-dialog { width:calc(100vw - 12px); max-height:calc(100vh - 12px); }
+  .settings-panel { max-height:calc(100vh - 16px); padding:12px; }
+  .appearance-settings-grid label { grid-template-columns:1fr 10px 96px; }
+}

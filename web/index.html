@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="zh-CN" data-runtime="web">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>随手记 · MenubarX</title>
+  <meta name="theme-color" content="#f5f4f0">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="../icons/icon48.png">
+  <link rel="apple-touch-icon" href="../icons/icon128.png">
+  <link rel="stylesheet" href="../css/writing.css">
+  <link rel="stylesheet" href="../css/editor.css">
+  <link rel="stylesheet" href="menubarx.css">
+</head>
+<body>
+  <div class="app-shell">
+    <section id="workspace-surface" class="workspace-surface is-drawer-open" data-drawer-mode="notes">
+      <aside id="workspace-rail" class="workspace-rail" aria-label="随手记功能栏">
+        <div class="rail-group">
+          <button id="rail-notes" class="rail-button" type="button" title="笔记" aria-label="展开笔记" aria-expanded="false">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4.5h9.5a3 3 0 0 1 3 3V19H8a3 3 0 0 1-3-3V4.5Z"/><path d="M8.5 9h5M8.5 12.5h5"/></svg>
+          </button>
+          <button id="rail-search" class="rail-button" type="button" title="搜索" aria-label="搜索笔记">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/></svg>
+          </button>
+          <span class="rail-note-step rail-separator" aria-hidden="true"></span>
+          <button id="previous-note" class="rail-button rail-note-step" type="button" title="上一条" aria-label="上一条">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 14 5-5 5 5"/></svg>
+          </button>
+          <button id="next-note" class="rail-button rail-note-step" type="button" title="下一条" aria-label="下一条">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg>
+          </button>
+          <button id="open-pip" class="rail-button" type="button" title="置顶小窗" aria-label="打开置顶小窗">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m8 4 8 8M13 4h3a2 2 0 0 1 2 2v3"/><path d="m11.5 10.5-5.8 5.8a2.1 2.1 0 0 0 3 3l5.8-5.8"/></svg>
+          </button>
+        </div>
+        <div class="rail-group rail-bottom">
+          <button id="settings-button" class="rail-button" type="button" title="设置与备份" aria-label="设置与备份">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5"/><path d="M19 13.5v-3l-2-.7a7 7 0 0 0-.7-1.6l.9-1.9-2.1-2.1-1.9.9a7 7 0 0 0-1.6-.7L10.5 2h-3l-.7 2.4a7 7 0 0 0-1.6.7l-1.9-.9-2.1 2.1.9 1.9a7 7 0 0 0-.7 1.6L1 10.5v3l2.4.7a7 7 0 0 0 .7 1.6l-.9 1.9 2.1 2.1 1.9-.9a7 7 0 0 0 1.6.7l.7 2.4h3l.7-2.4a7 7 0 0 0 1.6-.7l1.9.9 2.1-2.1-.9-1.9a7 7 0 0 0 .7-1.6L19 13.5Z" transform="translate(2.5 0) scale(.82)"/></svg>
+          </button>
+          <span id="version" class="rail-version"></span>
+        </div>
+      </aside>
+
+      <aside id="workspace-drawer" class="workspace-drawer" aria-label="随手记侧边栏">
+        <section id="drawer-notes" class="drawer-panel" aria-label="笔记">
+          <header class="drawer-header">
+            <div><strong>随手记</strong><span id="note-count" class="drawer-count"></span></div>
+            <div class="drawer-header-actions">
+              <button id="new-note" class="small-icon-button" type="button" title="新建笔记" aria-label="新建笔记">＋</button>
+              <button id="drawer-close" class="small-icon-button" type="button" title="收起侧边栏" aria-label="收起侧边栏">‹</button>
+            </div>
+          </header>
+          <label class="search-field" for="note-search">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/></svg>
+            <input id="note-search" type="search" placeholder="搜索标题或内容" autocomplete="off" spellcheck="false">
+            <span class="search-shortcut">⌘K</span>
+          </label>
+          <nav id="note-list" class="note-list" aria-label="笔记列表"></nav>
+          <div id="note-empty" class="note-empty" hidden>没有匹配的笔记</div>
+          <section class="trash-section" aria-label="回收站">
+            <button id="trash-toggle" class="trash-toggle" type="button" aria-expanded="false">
+              <span>回收站</span><span id="trash-count">0</span>
+            </button>
+            <div id="trash-panel" class="trash-panel" hidden>
+              <div id="trash-list" class="trash-list"></div>
+              <button id="empty-trash" class="trash-empty-button" type="button">清空回收站</button>
+            </div>
+          </section>
+        </section>
+      </aside>
+
+      <main class="editor-main">
+        <header class="editor-toolbar">
+          <div class="title-group">
+            <input id="active-title" class="active-title" type="text" maxlength="80" aria-label="笔记名称" placeholder="笔记名称" autocomplete="off" spellcheck="true">
+            <div id="save-status" class="save-status">已保存</div>
+          </div>
+          <div class="toolbar-actions">
+            <button id="delete-note" class="danger-button" type="button">删除</button>
+          </div>
+        </header>
+        <div id="editor-markdown-toolbar" class="markdown-toolbar markdown-toolbar-full" role="toolbar" aria-label="Markdown 格式工具栏">
+          <label class="markdown-block-picker" title="段落格式">
+            <span class="visually-hidden">段落格式</span>
+            <select data-toolbar-block aria-label="段落格式">
+              <option value="p">正文</option>
+              <option value="h1">H1</option>
+              <option value="h2">H2</option>
+              <option value="h3">H3</option>
+            </select>
+          </label>
+          <span class="markdown-toolbar-divider" aria-hidden="true"></span>
+          <button type="button" data-inline="strong" title="加粗" aria-label="加粗"><strong>B</strong></button>
+          <button type="button" data-inline="em" title="倾斜" aria-label="倾斜"><em>I</em></button>
+          <button type="button" data-inline="code" title="行内代码" aria-label="行内代码"><code>&lt;/&gt;</code></button>
+          <span class="markdown-toolbar-divider" aria-hidden="true"></span>
+          <button type="button" data-block="ul" title="项目列表" aria-label="项目列表">•</button>
+          <button type="button" data-block="ol" title="编号列表" aria-label="编号列表">1.</button>
+          <button type="button" data-block="blockquote" title="引用" aria-label="引用">❝</button>
+          <button type="button" data-action="divider" title="分隔线" aria-label="插入分隔线">—</button>
+          <span class="markdown-toolbar-divider markdown-history-divider" aria-hidden="true"></span>
+          <button type="button" data-action="undo" title="撤销 · ⌘Z" aria-label="撤销">↶</button>
+          <button type="button" data-action="redo" title="重做 · ⇧⌘Z" aria-label="重做">↷</button>
+        </div>
+        <section id="editor-card" class="editor-card">
+          <div id="note-editor" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="笔记内容" data-placeholder="直接写点什么……" spellcheck="true"></div>
+        </section>
+      </main>
+
+      <div id="undo-toast" class="undo-toast" role="status" aria-live="polite" hidden>
+        <span>已移到回收站</span><button id="undo-delete" type="button">撤销</button>
+      </div>
+
+      <dialog id="settings-dialog" class="settings-dialog">
+        <form method="dialog" class="settings-panel">
+          <header class="settings-header">
+            <div><strong>设置与备份</strong><p>笔记保存在当前 MenubarX 网页的本机空间，不上传。</p></div>
+            <button value="close" class="icon-button" aria-label="关闭">×</button>
+          </header>
+
+          <section class="settings-section" data-runtime-only="chrome">
+            <div class="section-copy"><strong>呼出快捷键</strong><p>在 Chrome 的扩展快捷键页面绑定；插件不强占默认组合键。</p></div>
+            <button id="open-shortcuts" type="button">设置快捷键</button>
+          </section>
+
+          <section class="settings-section" data-runtime-only="chrome">
+            <div class="section-copy"><strong>点击图标后的弹窗尺寸</strong><p>设置会在下次打开 Popup 时生效，完整编辑页不受影响。</p></div>
+            <select id="popup-size-select">
+              <option value="compact">紧凑 · 340 × 460</option>
+              <option value="standard">标准 · 400 × 560</option>
+              <option value="large">宽大 · 540 × 600</option>
+              <option value="wide">超宽 · 740 × 600</option>
+            </select>
+          </section>
+
+
+          <section class="settings-section appearance-settings-section">
+            <div class="section-copy"><strong>结构颜色</strong><p>只影响标题和列表圆点的显示，不写入 Markdown 正文。</p></div>
+            <div class="appearance-settings-grid">
+              <label>标题 1<span class="appearance-swatch" aria-hidden="true"></span><select id="appearance-h1" data-appearance="h1"></select></label>
+              <label>标题 2<span class="appearance-swatch" aria-hidden="true"></span><select id="appearance-h2" data-appearance="h2"></select></label>
+              <label>标题 3<span class="appearance-swatch" aria-hidden="true"></span><select id="appearance-h3" data-appearance="h3"></select></label>
+              <label>列表圆点<span class="appearance-swatch" aria-hidden="true"></span><select id="appearance-marker" data-appearance="marker"></select></label>
+            </div>
+          </section>
+
+          <section class="settings-section snapshot-section">
+            <div class="section-copy"><strong>安全快照</strong><p>仅在删除、导入和恢复前留底，最多保存最近 8 份。</p></div>
+            <div class="button-row"><button id="create-snapshot" type="button">立即留一份</button></div>
+            <div id="snapshot-list" class="snapshot-list"></div>
+          </section>
+
+          <section class="settings-section backup-section">
+            <div class="section-copy"><strong>本地自动备份</strong><p>停止输入后按变化写入，不轮询、不常驻。保留当前 JSON、最近 3 份历史和逐篇 Markdown。</p></div>
+            <div id="backup-status" class="backup-status">尚未连接备份目录</div>
+            <div class="button-row">
+              <button id="connect-backup" type="button">选择目录</button>
+              <button id="backup-now" type="button">立即备份</button>
+              <button id="restore-backup" type="button">从目录恢复</button>
+              <button id="disconnect-backup" type="button">断开</button>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <div class="section-copy"><strong>手动导入导出</strong><p>JSON 用于完整恢复；Markdown 用于在其他编辑器中继续使用当前笔记。</p></div>
+            <div class="button-row">
+              <button id="export-json" type="button">导出完整 JSON</button>
+              <button id="export-markdown" type="button">导出当前 Markdown</button>
+              <button id="import-json" type="button">导入 JSON</button>
+              <input id="import-json-input" type="file" accept="application/json,.json" hidden>
+            </div>
+          </section>
+
+          <p class="settings-note">此版本不与 Chrome 自动同步。首次使用可在 Chrome 导出完整 JSON，再在这里导入；更换网址前请先导出备份。</p>
+        </form>
+      </dialog>
+    </section>
+
+    <section id="pip-host-message" class="pip-host-message" aria-live="polite">
+      <div>
+        <strong>置顶小窗正在使用</strong>
+        <p>保持此页面打开，小窗就会持续置顶；你可以切换到其他应用继续工作。</p>
+      </div>
+      <button id="focus-pip" type="button">聚焦小窗</button>
+    </section>
+  </div>
+
+  <script type="module" src="menubarx.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "随手记 · MenubarX",
+  "short_name": "随手记",
+  "description": "安静、快速、本地优先的 Markdown 随手记。",
+  "lang": "zh-CN",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f4f0",
+  "theme_color": "#f5f4f0",
+  "icons": [
+    { "src": "../icons/icon48.png", "sizes": "48x48", "type": "image/png" },
+    { "src": "../icons/icon128.png", "sizes": "128x128", "type": "image/png" }
+  ]
+}
