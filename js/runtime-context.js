@@ -1,3 +1,4 @@
+import { createChromeStorageArea } from './state-channel.js';
 function safeLocalStorage() {
   try { return globalThis.localStorage ?? null; }
   catch { return null; }
@@ -9,7 +10,7 @@ function chromeRuntime() {
   const manifest = chromeApi.runtime.getManifest();
   return {
     kind: 'chrome',
-    storageArea: chromeApi.storage.local,
+    storageArea: createChromeStorageArea(chromeApi),
     draftStorage: safeLocalStorage(),
     draftKey: 'quickNotesEmergencyDraft',
     appVersion: String(manifest.version || '0.0.0'),

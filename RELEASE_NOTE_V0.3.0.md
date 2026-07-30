@@ -1,1 +1,0 @@
-Hosted Web V0.3.0: multi-window safety, links, tasks, compact image cards, and improved backup capability messaging.

@@ -1,1 +1,0 @@
-This temporary branch-only file will be removed by the final release tree commit.
