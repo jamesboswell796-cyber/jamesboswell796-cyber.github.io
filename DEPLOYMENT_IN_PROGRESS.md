@@ -1,0 +1,1 @@
+Quick Notes Hosted Web V0.3.0 release is being prepared on this branch. This marker is removed before merge.
