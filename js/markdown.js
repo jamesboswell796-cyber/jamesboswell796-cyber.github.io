@@ -1,4 +1,4 @@
-const INLINE_PATTERN = /(\*\*([^*\n]+)\*\*|`([^`\n]+)`|(?<!\*)\*([^*\n]+)\*(?!\*))/gu;
+const INLINE_PATTERN = /(\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^)\s]+)\)|\*\*([^*\n]+)\*\*|`([^`\n]+)`|(?<!\*)\*([^*\n]+)\*(?!\*))/gu;
 
 export function parseInlineMarkdown(source) {
   const value = String(source ?? '');
@@ -7,9 +7,10 @@ export function parseInlineMarkdown(source) {
   for (const match of value.matchAll(INLINE_PATTERN)) {
     const index = match.index ?? 0;
     if (index > cursor) tokens.push({ type: 'text', text: value.slice(cursor, index) });
-    if (match[2] !== undefined) tokens.push({ type: 'strong', text: match[2] });
-    else if (match[3] !== undefined) tokens.push({ type: 'code', text: match[3] });
-    else tokens.push({ type: 'em', text: match[4] });
+    if (match[2] !== undefined) tokens.push({ type: 'link', text: match[2], href: match[3] });
+    else if (match[4] !== undefined) tokens.push({ type: 'strong', text: match[4] });
+    else if (match[5] !== undefined) tokens.push({ type: 'code', text: match[5] });
+    else tokens.push({ type: 'em', text: match[6] });
     cursor = index + match[0].length;
   }
   if (cursor < value.length) tokens.push({ type: 'text', text: value.slice(cursor) });
@@ -18,6 +19,7 @@ export function parseInlineMarkdown(source) {
 
 export function inlineTokensToMarkdown(tokens) {
   return (tokens ?? []).map(token => {
+    if (token.type === 'link') return `[${token.text}](${token.href})`;
     if (token.type === 'strong') return `**${token.text}**`;
     if (token.type === 'em') return `*${token.text}*`;
     if (token.type === 'code') return `\`${token.text}\``;
@@ -40,6 +42,8 @@ export function detectBlockShortcut(text) {
   for (const [type, marker] of rules) {
     if (value.startsWith(marker)) return { type, marker, content: value.slice(marker.length) };
   }
+  const task = value.match(/^([-*+]\s\[([ xX])\]\s)(.*)$/u);
+  if (task) return { type: 'task', marker: task[1], checked: task[2].toLowerCase() === 'x', content: task[3] };
   const bullet = value.match(/^([-*+]\s)(.*)$/u);
   if (bullet) return { type: 'ul', marker: bullet[1], content: bullet[2] };
   const ordered = value.match(/^(\d+\.\s)(.*)$/u);
@@ -58,6 +62,23 @@ export function parseMarkdownDocument(source) {
     }
     if (line.trim() === '---') {
       blocks.push({ type: 'hr' });
+      continue;
+    }
+    const imageMatch = line.trim().match(/^\[\[image:([A-Za-z0-9_-]+)\]\]$/u);
+    if (imageMatch) {
+      blocks.push({ type: 'image', assetId: imageMatch[1] });
+      continue;
+    }
+    const taskMatch = line.match(/^[-*+]\s+\[([ xX])\]\s+(.+)$/u);
+    if (taskMatch) {
+      const items = [{ checked: taskMatch[1].toLowerCase() === 'x', inline: parseInlineMarkdown(taskMatch[2].trim()) }];
+      while (index + 1 < lines.length) {
+        const next = lines[index + 1].trimEnd().match(/^[-*+]\s+\[([ xX])\]\s+(.+)$/u);
+        if (!next) break;
+        items.push({ checked: next[1].toLowerCase() === 'x', inline: parseInlineMarkdown(next[2].trim()) });
+        index += 1;
+      }
+      blocks.push({ type: 'task', items });
       continue;
     }
     let match = line.match(/^###\s+(.+)$/u);
@@ -85,7 +106,7 @@ export function parseMarkdownDocument(source) {
       const items = [parseInlineMarkdown(match[1].trim())];
       while (index + 1 < lines.length) {
         const next = lines[index + 1].trimEnd().match(/^[-*+]\s+(.+)$/u);
-        if (!next) break;
+        if (!next || /^\[[ xX]\]\s/u.test(next[1])) break;
         items.push(parseInlineMarkdown(next[1].trim()));
         index += 1;
       }
@@ -116,7 +137,10 @@ export function markdownDocumentToMarkdown(blocks) {
   for (const block of blocks ?? []) {
     if (block.type === 'blank') lines.push('');
     else if (block.type === 'hr') lines.push('---');
-    else if (block.type === 'h1') lines.push(`# ${inlineTokensToMarkdown(block.inline)}`);
+    else if (block.type === 'image') lines.push(`[[image:${block.assetId}]]`);
+    else if (block.type === 'task') {
+      for (const item of block.items) lines.push(`- [${item.checked ? 'x' : ' '}] ${inlineTokensToMarkdown(item.inline)}`);
+    } else if (block.type === 'h1') lines.push(`# ${inlineTokensToMarkdown(block.inline)}`);
     else if (block.type === 'h2') lines.push(`## ${inlineTokensToMarkdown(block.inline)}`);
     else if (block.type === 'h3') lines.push(`### ${inlineTokensToMarkdown(block.inline)}`);
     else if (block.type === 'blockquote') lines.push(`> ${inlineTokensToMarkdown(block.inline)}`);
@@ -133,6 +157,14 @@ export function markdownBlocks(source) {
   const blocks = [];
   for (const block of parseMarkdownDocument(source)) {
     if (block.type === 'blank') continue;
+    if (block.type === 'task') {
+      for (const item of block.items) blocks.push({ type: 'task', text: item.inline.map(token => token.text).join(''), checked: item.checked });
+      continue;
+    }
+    if (block.type === 'image') {
+      blocks.push({ type: 'image', text: '[图片]', assetId: block.assetId });
+      continue;
+    }
     if (block.type === 'ul' || block.type === 'ol') {
       for (const item of block.items) blocks.push({ type: 'li', text: item.map(token => token.text).join('') });
       continue;
@@ -156,6 +188,30 @@ export function renderMarkdown(container, source) {
     }
     if (block.type === 'hr') {
       nodes.push(doc.createElement('hr'));
+      continue;
+    }
+    if (block.type === 'task') {
+      const list = doc.createElement('ul');
+      list.className = 'task-list';
+      for (const task of block.items) {
+        const item = doc.createElement('li');
+        item.dataset.checked = String(task.checked);
+        const mark = doc.createElement('span');
+        mark.className = 'task-mark';
+        mark.textContent = task.checked ? '☑' : '☐';
+        item.append(mark, doc.createTextNode(' '));
+        appendInlineNodes(item, task.inline);
+        list.appendChild(item);
+      }
+      nodes.push(list);
+      continue;
+    }
+    if (block.type === 'image') {
+      const figure = doc.createElement('figure');
+      figure.className = 'image-card';
+      figure.dataset.assetId = block.assetId;
+      figure.textContent = '图片';
+      nodes.push(figure);
       continue;
     }
     if (block.type === 'ul' || block.type === 'ol') {
@@ -185,14 +241,23 @@ export function renderMarkdown(container, source) {
 export function appendInlineNodes(container, tokens) {
   const doc = container.ownerDocument ?? globalThis.document;
   for (const token of tokens ?? []) {
-    const node = token.type === 'strong'
-      ? doc.createElement('strong')
-      : token.type === 'em'
-        ? doc.createElement('em')
-        : token.type === 'code'
-          ? doc.createElement('code')
-          : doc.createTextNode(token.text ?? '');
-    if (node.nodeType === 1) node.textContent = token.text ?? '';
+    const node = token.type === 'link'
+      ? doc.createElement('a')
+      : token.type === 'strong'
+        ? doc.createElement('strong')
+        : token.type === 'em'
+          ? doc.createElement('em')
+          : token.type === 'code'
+            ? doc.createElement('code')
+            : doc.createTextNode(token.text ?? '');
+    if (node.nodeType === 1) {
+      node.textContent = token.text ?? '';
+      if (token.type === 'link') {
+        node.href = token.href;
+        node.target = '_blank';
+        node.rel = 'noreferrer noopener';
+      }
+    }
     container.appendChild(node);
   }
 }

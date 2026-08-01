@@ -383,3 +383,25 @@ html, body {
 .snapshot-empty { color:#a09f9b; font-size:9px; }
 
 .pip-document .undo-toast { left: 50px; bottom: 14px; }
+
+/* V1.1: optional Prompt Library drawer. */
+.prompt-drawer-panel { grid-template-rows: auto auto auto minmax(0, 1fr); }
+.prompt-status { min-height: 24px; padding: 0 18px 8px; color: #999995; font-size: 9px; line-height: 1.45; }
+.prompt-list { min-height: 0; overflow: auto; padding: 0 9px 18px; }
+.prompt-row {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: #595a5e;
+  text-align: left;
+}
+.prompt-row:hover { background: #eeede9; }
+.prompt-row-title { overflow: hidden; font-size: 11px; font-weight: 680; text-overflow: ellipsis; white-space: nowrap; }
+.prompt-row-excerpt { display: -webkit-box; overflow: hidden; color: #969692; font-size: 9px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.prompt-row-tags { overflow: hidden; color: #aaa9a5; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.pip-document #rail-prompts,
+.pip-document #drawer-prompts { display: none !important; }

@@ -6,6 +6,7 @@ export const BACKUP_FORMAT = 'quick-notes-backup';
 export const BACKUP_SCHEMA = 1;
 const BACKUP_JSON = 'quick-notes-backup.json';
 const BACKUP_MANIFEST = 'backup-manifest.json';
+const BACKUP_ASSETS = 'assets.json';
 
 
 function normalizedTimestamp(value) {
@@ -49,13 +50,16 @@ export function buildBackupFiles(state, options = {}) {
   const snapshot = createBackupSnapshot(state, options);
   const files = new Map();
   const noteFiles = snapshot.state.notes.map(note => noteBackupFilename(note));
+  const assets = Array.isArray(options.assets) ? options.assets : [];
   files.set(BACKUP_JSON, `${JSON.stringify(snapshot, null, 2)}\n`);
   files.set(BACKUP_MANIFEST, `${JSON.stringify({
     format: BACKUP_FORMAT,
     backupSchema: BACKUP_SCHEMA,
     generatedAt: snapshot.exportedAt,
     noteFiles,
+    assetCount: assets.length,
   }, null, 2)}\n`);
+  files.set(BACKUP_ASSETS, `${JSON.stringify({ assets }, null, 2)}\n`);
   snapshot.state.notes.forEach((note, index) => {
     files.set(`notes/${noteFiles[index]}`, noteToMarkdown(note));
   });
@@ -146,11 +150,25 @@ export async function writeBackupToDirectory(directoryHandle, state, options = {
   return { folderName: BACKUP_FOLDER_NAME, noteCount: currentNoteFiles.length };
 }
 
-export async function readBackupFromDirectory(directoryHandle) {
+export async function readBackupBundleFromDirectory(directoryHandle) {
   if (!directoryHandle || directoryHandle.kind !== 'directory') throw new Error('备份目录不可用');
   const root = await directoryHandle.getDirectoryHandle(BACKUP_FOLDER_NAME);
   const snapshot = JSON.parse(await readTextFile(root, BACKUP_JSON));
-  return validateBackupSnapshot(snapshot);
+  const assetsText = await readOptionalTextFile(root, BACKUP_ASSETS);
+  let assets = [];
+  if (assetsText) {
+    try {
+      const parsed = JSON.parse(assetsText);
+      assets = Array.isArray(parsed?.assets) ? parsed.assets : [];
+    } catch {
+      assets = [];
+    }
+  }
+  return { state: validateBackupSnapshot(snapshot), assets };
+}
+
+export async function readBackupFromDirectory(directoryHandle) {
+  return (await readBackupBundleFromDirectory(directoryHandle)).state;
 }
 
 export function createBackupScheduler(writer, options = {}) {

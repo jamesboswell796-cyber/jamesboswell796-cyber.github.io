@@ -46,6 +46,14 @@ export function createIndexedDbStorageArea(options = {}) {
   if (!indexedDB) throw new Error('当前浏览器不支持 IndexedDB');
   const dbName = options.dbName ?? 'quickNotesMenubarX';
   const storeName = options.storeName ?? 'keyValue';
+  const listeners = new Set();
+  const channelName = options.channelName ?? `${dbName}:changes`;
+  const Channel = options.BroadcastChannel ?? globalThis.BroadcastChannel;
+  const channel = Channel ? new Channel(channelName) : null;
+  if (channel) channel.addEventListener('message', event => {
+    const patch = event.data?.patch;
+    if (patch && typeof patch === 'object') for (const listener of listeners) listener(clone(patch));
+  });
   let databasePromise;
 
   function openDatabase() {
@@ -90,5 +98,17 @@ export function createIndexedDbStorageArea(options = {}) {
     },
   };
 
-  return createStorageAreaFromKeyValueStore(store);
+  const area = createStorageAreaFromKeyValueStore(store);
+  return {
+    ...area,
+    async set(patch) {
+      await area.set(patch);
+      channel?.postMessage({ patch: clone(patch) });
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    close() { channel?.close?.(); },
+  };
 }

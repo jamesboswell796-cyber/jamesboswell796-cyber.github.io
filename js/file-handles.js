@@ -52,6 +52,6 @@ export async function ensureReadWritePermission(handle, options = {}) {
 
 export async function pickBackupDirectory(options = {}) {
   const picker = options.picker ?? globalThis.showDirectoryPicker;
-  if (typeof picker !== 'function') throw new Error('当前 Chrome 不支持选择本地备份目录');
+  if (typeof picker !== 'function') throw new Error('当前浏览器不支持持续写入指定文件夹');
   return picker({ id: 'quick-notes-backup', mode: 'readwrite', startIn: 'documents' });
 }

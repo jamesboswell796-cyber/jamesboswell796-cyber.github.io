@@ -1,6 +1,6 @@
 import { createIndexedDbStorageArea } from '../js/web-storage.js';
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 const storageArea = createIndexedDbStorageArea({ dbName: 'quickNotesMenubarX' });
 
 globalThis.__QUICK_NOTES_RUNTIME__ = {

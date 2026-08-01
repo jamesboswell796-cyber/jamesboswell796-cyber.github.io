@@ -207,3 +207,122 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 }
 .markdown-toolbar button:disabled:hover { background: transparent; color: inherit; }
 .markdown-history-divider { margin-left: 5px; }
+
+/* V1.1: lightweight links, tasks, compact image cards and image preview. */
+.rich-editor a {
+  color: #5f6f84;
+  text-decoration: underline;
+  text-decoration-color: rgba(95,111,132,.35);
+  text-underline-offset: 3px;
+}
+.rich-editor .task-list {
+  margin: 7px 0 17px;
+  padding-left: 0;
+  list-style: none;
+}
+.rich-editor .task-item {
+  display: grid;
+  grid-template-columns: 19px minmax(0, 1fr);
+  align-items: start;
+  gap: 5px;
+  margin: 5px 0;
+}
+.rich-editor .task-toggle {
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  margin: .38em 0 0;
+  padding: 0;
+  border: 1px solid #c7c6c1;
+  border-radius: 5px;
+  background: #faf9f6;
+  color: #6d756e;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.rich-editor .task-item[data-checked="true"] .task-content {
+  color: #999995;
+  text-decoration: line-through;
+  text-decoration-color: rgba(120,120,116,.34);
+}
+.rich-editor .image-card {
+  position: relative;
+  width: min(220px, 72%);
+  min-height: 108px;
+  display: grid;
+  place-items: center;
+  margin: 18px 0;
+  border: 1px solid #dfddd7;
+  border-radius: 13px;
+  overflow: hidden;
+  background: #f5f4f0;
+  color: #999995;
+  cursor: zoom-in;
+  box-shadow: 0 4px 14px rgba(44,44,41,.045);
+}
+.rich-editor .image-card-media {
+  width: 100%;
+  min-height: 108px;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+}
+.rich-editor .image-card img {
+  display: block;
+  width: 100%;
+  max-height: 170px;
+  object-fit: contain;
+  background: #f2f1ed;
+}
+.rich-editor .image-card-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(247,246,242,.9);
+  color: #797a7d;
+  font-size: 15px;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 100ms ease, background 100ms ease;
+}
+.rich-editor .image-card:hover .image-card-remove,
+.rich-editor .image-card:focus-within .image-card-remove { opacity: 1; }
+.rich-editor .image-card-remove:hover { background: #fff; color: #5a4d50; }
+.rich-editor .image-card.is-missing { border-style: dashed; }
+.image-preview-dialog {
+  max-width: min(92vw, 1080px);
+  max-height: 90vh;
+  padding: 0;
+  border: 1px solid #d8d6d0;
+  border-radius: 16px;
+  background: #f8f7f3;
+  box-shadow: 0 28px 90px rgba(30,30,28,.28);
+}
+.image-preview-dialog::backdrop { background: rgba(35,35,33,.52); }
+.image-preview-panel { position: relative; display: grid; max-height: 90vh; }
+.image-preview-panel img { display: block; max-width: 90vw; max-height: 82vh; object-fit: contain; }
+.image-preview-caption { padding: 9px 42px 10px 13px; color: #858681; font-size: 10px; }
+.image-preview-close {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 29px;
+  height: 29px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255,255,255,.88);
+  color: #55565a;
+  font-size: 18px;
+}

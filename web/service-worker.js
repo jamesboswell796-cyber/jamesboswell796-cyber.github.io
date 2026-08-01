@@ -1,4 +1,4 @@
-const CACHE_NAME = 'quick-notes-menubarx-v0.2.0';
+const CACHE_NAME = 'quick-notes-menubarx-v0.3.0';
 const APP_SHELL = [
   './',
   './index.html',
@@ -11,12 +11,19 @@ const APP_SHELL = [
   '../icons/icon48.png',
   '../icons/icon128.png',
   '../js/appearance.js',
+  '../js/asset-repository.js',
+  '../js/image-preview.js',
+  '../js/image-tools.js',
+  '../js/prompt-bridge.js',
+  '../js/state-channel.js',
+  '../js/state-sync.js',
   '../js/autosave.js',
   '../js/backup-service.js',
   '../js/backup.js',
   '../js/draft-cache.js',
   '../js/edit-history.js',
   '../js/editor.js',
+  '../js/editor.payload.gz',
   '../js/export.js',
   '../js/file-handles.js',
   '../js/markdown-toolbar.js',
@@ -27,6 +34,7 @@ const APP_SHELL = [
   '../js/note-markdown.js',
   '../js/pip-manager.js',
   '../js/rich-editor.js',
+  '../js/rich-editor.payload.gz',
   '../js/runtime-context.js',
   '../js/safety-snapshots.js',
   '../js/sidebar-controller.js',

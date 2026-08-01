@@ -1,7 +1,7 @@
 import { normalizeAppearance, DEFAULT_APPEARANCE } from './appearance.js';
 import { inlineMarkdownToText } from './markdown.js';
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 export const TRASH_LIMIT = 20;
 export const POPUP_SIZE_PRESETS = Object.freeze({
   compact: Object.freeze({ width: 340, height: 460 }),
@@ -12,7 +12,7 @@ export const POPUP_SIZE_PRESETS = Object.freeze({
 export const POPUP_SIZES = Object.freeze(Object.keys(POPUP_SIZE_PRESETS));
 
 function copyNote(note) {
-  return { ...note };
+  return { ...note, revision: Math.max(0, Number(note?.revision) || 0) };
 }
 
 function copyTrashItem(item) {
@@ -22,6 +22,7 @@ function copyTrashItem(item) {
 function copyState(state) {
   return {
     schemaVersion: SCHEMA_VERSION,
+    stateRevision: Math.max(0, Number(state.stateRevision) || 0),
     activeNoteId: state.activeNoteId,
     notes: state.notes.map(copyNote),
     trash: (state.trash ?? []).map(copyTrashItem),
@@ -66,6 +67,7 @@ function normalizeNote(raw, now, { legacy = false } = {}) {
       body: String(raw?.body ?? ''),
       createdAt: String(raw?.createdAt ?? now),
       updatedAt: String(raw?.updatedAt ?? raw?.createdAt ?? now),
+      revision: Math.max(0, Number(raw?.revision) || 0),
     };
   }
 
@@ -84,6 +86,7 @@ function normalizeNote(raw, now, { legacy = false } = {}) {
     body: lines.join('\n'),
     createdAt: String(raw?.createdAt ?? now),
     updatedAt: String(raw?.updatedAt ?? raw?.createdAt ?? now),
+    revision: Math.max(0, Number(raw?.revision) || 0),
   };
 }
 
@@ -92,8 +95,9 @@ export function createInitialState(options = {}) {
   const id = String(options.id ?? crypto.randomUUID());
   return {
     schemaVersion: SCHEMA_VERSION,
+    stateRevision: 0,
     activeNoteId: id,
-    notes: [{ id, title: '新笔记', body: '', createdAt: now, updatedAt: now }],
+    notes: [{ id, title: '新笔记', body: '', createdAt: now, updatedAt: now, revision: 0 }],
     trash: [],
     preferences: { popupSize: 'standard', appearance: { ...DEFAULT_APPEARANCE } },
   };
@@ -150,6 +154,7 @@ export function normalizeState(input, options = {}) {
     : 'standard';
   return {
     schemaVersion: SCHEMA_VERSION,
+    stateRevision: Math.max(0, Number(input?.stateRevision) || 0),
     activeNoteId,
     notes,
     trash,
@@ -162,7 +167,7 @@ export function createNote(state, options = {}) {
   const now = options.now ?? new Date().toISOString();
   const id = String(options.id ?? crypto.randomUUID());
   if (next.notes.some(note => note.id === id)) throw new Error('笔记 ID 重复');
-  next.notes.push({ id, title: '新笔记', body: '', createdAt: now, updatedAt: now });
+  next.notes.push({ id, title: '新笔记', body: '', createdAt: now, updatedAt: now, revision: 0 });
   next.activeNoteId = id;
   return next;
 }
@@ -217,7 +222,7 @@ export function moveNoteToTrash(state, id, options = {}) {
   if (!next.notes.length) {
     const now = String(options.now ?? new Date().toISOString());
     const replacementId = String(options.id ?? crypto.randomUUID());
-    next.notes.push({ id: replacementId, title: '新笔记', body: '', createdAt: now, updatedAt: now });
+    next.notes.push({ id: replacementId, title: '新笔记', body: '', createdAt: now, updatedAt: now, revision: 0 });
     next.activeNoteId = replacementId;
   } else if (next.activeNoteId === id) {
     next.activeNoteId = next.notes[Math.min(index, next.notes.length - 1)].id;

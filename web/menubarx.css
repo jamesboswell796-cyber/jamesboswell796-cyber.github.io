@@ -1,4 +1,4 @@
-/* MenubarX Web V0.2.0: responsive full workspace, no overlay drawer. */
+/* MenubarX Web V0.3.0: responsive full workspace, no overlay drawer. */
 html, body {
   min-width: 360px;
   min-height: 320px;
@@ -161,4 +161,9 @@ html[data-runtime="web"] [data-runtime-only="chrome"] { display: none !important
   .settings-dialog { width:calc(100vw - 12px); max-height:calc(100vh - 12px); }
   .settings-panel { max-height:calc(100vh - 16px); padding:12px; }
   .appearance-settings-grid label { grid-template-columns:1fr 10px 96px; }
+}
+
+/* V0.3 hosted image cards remain compact in narrow menu-bar windows. */
+@media (max-width: 520px) {
+  .rich-editor .image-card { width: min(190px, 78%); }
 }
