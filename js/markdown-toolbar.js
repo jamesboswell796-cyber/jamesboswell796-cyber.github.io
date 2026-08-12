@@ -1,4 +1,4 @@
-const BLOCK_TYPES = new Set(['p', 'h1', 'h2', 'h3', 'ul', 'ol', 'task', 'blockquote']);
+const BLOCK_TYPES = new Set(['p', 'h1', 'h2', 'h3', 'ul', 'ol', 'blockquote']);
 const PICKER_TYPES = new Set(['p', 'h1', 'h2', 'h3']);
 
 function normalizeBlockType(value) {
@@ -28,8 +28,6 @@ export function createMarkdownToolbar({ element, editor }) {
     if (button.dataset.inline) editor.applyInline(button.dataset.inline);
     if (button.dataset.block) editor.applyBlock(button.dataset.block);
     if (button.dataset.action === 'divider') editor.insertDivider();
-    if (button.dataset.action === 'link') editor.requestLink?.();
-    if (button.dataset.action === 'image') editor.requestImage?.();
     if (button.dataset.action === 'undo') editor.undo?.();
     if (button.dataset.action === 'redo') editor.redo?.();
   }

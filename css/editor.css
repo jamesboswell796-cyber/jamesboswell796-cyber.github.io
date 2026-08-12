@@ -142,12 +142,26 @@ html, body {
 .search-field input { min-width: 0; border: 0; outline: 0; background: transparent; color: #4e4f52; font-size: 12px; }
 .search-field input::placeholder { color: #a7a6a2; }
 .search-shortcut { color: #b6b5b1; font-size: 9px; }
+.note-order-hint {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 15px;
+  margin: -4px 15px 5px;
+  color: #aaa9a5;
+  font-size: 9px;
+}
+.note-order-hint kbd { font: inherit; }
+.note-order-hint[hidden] { display: none; }
 
 .note-list { min-height: 0; overflow: auto; padding: 0 9px 18px; }
 .note-row {
+  position: relative;
   width: 100%;
   display: grid;
-  gap: 4px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
   border: 0;
   border-radius: 11px;
   padding: 10px 10px 9px;
@@ -156,6 +170,28 @@ html, body {
   text-align: left;
   cursor: pointer;
 }
+.note-row[draggable="true"] { cursor: grab; }
+.note-row.is-dragging { opacity: .42; cursor: grabbing; }
+.note-row.is-drop-before::before,
+.note-row.is-drop-after::after {
+  position: absolute;
+  right: 7px;
+  left: 7px;
+  height: 2px;
+  border-radius: 999px;
+  background: #777b84;
+  content: "";
+  pointer-events: none;
+}
+.note-row.is-drop-before::before { top: -1px; }
+.note-row.is-drop-after::after { bottom: -1px; }
+.note-row-grip {
+  color: #b6b5b1;
+  font-size: 11px;
+  line-height: 1;
+}
+.note-row[draggable="false"] .note-row-grip { display: none; }
+.note-row-copy { min-width: 0; display: grid; gap: 4px; }
 .note-row:hover { background: #efeeea; }
 .note-row.is-active { background: #e7e6e2; color: #343538; }
 .note-row-title {
@@ -383,25 +419,3 @@ html, body {
 .snapshot-empty { color:#a09f9b; font-size:9px; }
 
 .pip-document .undo-toast { left: 50px; bottom: 14px; }
-
-/* V1.1: optional Prompt Library drawer. */
-.prompt-drawer-panel { grid-template-rows: auto auto auto minmax(0, 1fr); }
-.prompt-status { min-height: 24px; padding: 0 18px 8px; color: #999995; font-size: 9px; line-height: 1.45; }
-.prompt-list { min-height: 0; overflow: auto; padding: 0 9px 18px; }
-.prompt-row {
-  width: 100%;
-  display: grid;
-  gap: 4px;
-  padding: 10px;
-  border: 0;
-  border-radius: 11px;
-  background: transparent;
-  color: #595a5e;
-  text-align: left;
-}
-.prompt-row:hover { background: #eeede9; }
-.prompt-row-title { overflow: hidden; font-size: 11px; font-weight: 680; text-overflow: ellipsis; white-space: nowrap; }
-.prompt-row-excerpt { display: -webkit-box; overflow: hidden; color: #969692; font-size: 9px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
-.prompt-row-tags { overflow: hidden; color: #aaa9a5; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-.pip-document #rail-prompts,
-.pip-document #drawer-prompts { display: none !important; }

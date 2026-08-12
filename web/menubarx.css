@@ -1,4 +1,4 @@
-/* MenubarX Web V0.3.0: responsive full workspace, no overlay drawer. */
+/* MenubarX Web V0.2.0: responsive full workspace, no overlay drawer. */
 html, body {
   min-width: 360px;
   min-height: 320px;
@@ -45,8 +45,11 @@ html[data-runtime="web"] [data-runtime-only="chrome"] { display: none !important
 .small-icon-button { width:25px; height:25px; border-radius:8px; font-size:16px; }
 .search-field { min-height:34px; margin:0 8px 8px; padding:0 7px; grid-template-columns:17px minmax(0,1fr) auto; }
 .search-field input { font-size:11px; }
+.note-order-hint { min-height:13px; margin:-4px 9px 4px; font-size:8px; }
 .note-list { padding:0 6px 12px; }
-.note-row { gap:3px; padding:8px 7px; border-radius:9px; }
+.note-row { gap:5px; padding:8px 7px; border-radius:9px; }
+.note-row-copy { gap:3px; }
+.note-row-grip { font-size:9px; }
 .note-row-title { font-size:11px; }
 .note-row-excerpt { font-size:9px; -webkit-line-clamp:2; }
 .trash-toggle { min-height:34px; padding:0 10px; }
@@ -131,8 +134,9 @@ html[data-runtime="web"] [data-runtime-only="chrome"] { display: none !important
   .drawer-count { display:none; }
   .search-field { margin:0 5px 6px; padding:0 5px; grid-template-columns:15px minmax(0,1fr); }
   .search-shortcut { display:none; }
+  .note-order-hint { margin:-2px 6px 3px; }
   .note-list { padding:0 4px 8px; }
-  .note-row { padding:7px 6px; }
+  .note-row { gap:3px; padding:7px 6px; }
   .note-row-excerpt { display:none; }
   .editor-main { padding:8px 8px 10px; }
   .editor-toolbar { min-height:39px; margin-bottom:4px; }
@@ -161,9 +165,4 @@ html[data-runtime="web"] [data-runtime-only="chrome"] { display: none !important
   .settings-dialog { width:calc(100vw - 12px); max-height:calc(100vh - 12px); }
   .settings-panel { max-height:calc(100vh - 16px); padding:12px; }
   .appearance-settings-grid label { grid-template-columns:1fr 10px 96px; }
-}
-
-/* V0.3 hosted image cards remain compact in narrow menu-bar windows. */
-@media (max-width: 520px) {
-  .rich-editor .image-card { width: min(190px, 78%); }
 }

@@ -23,9 +23,6 @@
           <button id="rail-search" class="rail-button" type="button" title="搜索" aria-label="搜索笔记">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/></svg>
           </button>
-          <button id="rail-prompts" class="rail-button" type="button" title="提示词库" aria-label="打开提示词库" aria-expanded="false" data-runtime-only="chrome">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 5h14v11H9l-4 3V5Z"/><path d="M9 9h6M9 12h4"/></svg>
-          </button>
           <span class="rail-note-step rail-separator" aria-hidden="true"></span>
           <button id="previous-note" class="rail-button rail-note-step" type="button" title="上一条" aria-label="上一条">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 14 5-5 5 5"/></svg>
@@ -59,6 +56,7 @@
             <input id="note-search" type="search" placeholder="搜索标题或内容" autocomplete="off" spellcheck="false">
             <span class="search-shortcut">⌘K</span>
           </label>
+          <p id="note-order-hint" class="note-order-hint">拖动排序 · <kbd>⌥/Alt ↑↓</kbd></p>
           <nav id="note-list" class="note-list" aria-label="笔记列表"></nav>
           <div id="note-empty" class="note-empty" hidden>没有匹配的笔记</div>
           <section class="trash-section" aria-label="回收站">
@@ -70,22 +68,6 @@
               <button id="empty-trash" class="trash-empty-button" type="button">清空回收站</button>
             </div>
           </section>
-        </section>
-        <section id="drawer-prompts" class="drawer-panel prompt-drawer-panel" aria-label="提示词库" hidden data-runtime-only="chrome">
-          <header class="drawer-header">
-            <div><strong>提示词库</strong><span class="drawer-subtitle">轻连接</span></div>
-            <div class="drawer-header-actions">
-              <button id="save-as-prompt" class="small-icon-button" type="button" title="保存当前文字为提示词" aria-label="保存当前文字为提示词">＋</button>
-              <button class="small-icon-button prompt-drawer-close" type="button" title="收起侧边栏" aria-label="收起侧边栏">‹</button>
-            </div>
-          </header>
-          <label class="search-field" for="prompt-search">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/></svg>
-            <input id="prompt-search" type="search" placeholder="搜索提示词" autocomplete="off" spellcheck="false">
-          </label>
-          <div id="prompt-status" class="prompt-status">正在连接提示词库…</div>
-          <nav id="prompt-list" class="prompt-list" aria-label="提示词列表"></nav>
-          <div id="prompt-empty" class="note-empty" hidden>没有匹配的提示词</div>
         </section>
       </aside>
 
@@ -113,14 +95,11 @@
           <button type="button" data-inline="strong" title="加粗" aria-label="加粗"><strong>B</strong></button>
           <button type="button" data-inline="em" title="倾斜" aria-label="倾斜"><em>I</em></button>
           <button type="button" data-inline="code" title="行内代码" aria-label="行内代码"><code>&lt;/&gt;</code></button>
-          <button type="button" data-action="link" title="插入链接" aria-label="插入链接">↗</button>
           <span class="markdown-toolbar-divider" aria-hidden="true"></span>
           <button type="button" data-block="ul" title="项目列表" aria-label="项目列表">•</button>
           <button type="button" data-block="ol" title="编号列表" aria-label="编号列表">1.</button>
-          <button type="button" data-block="task" title="任务清单" aria-label="任务清单">☐</button>
           <button type="button" data-block="blockquote" title="引用" aria-label="引用">❝</button>
           <button type="button" data-action="divider" title="分隔线" aria-label="插入分隔线">—</button>
-          <button type="button" data-action="image" title="插入小图" aria-label="插入图片">▧</button>
           <span class="markdown-toolbar-divider markdown-history-divider" aria-hidden="true"></span>
           <button type="button" data-action="undo" title="撤销 · ⌘Z" aria-label="撤销">↶</button>
           <button type="button" data-action="redo" title="重做 · ⇧⌘Z" aria-label="重做">↷</button>

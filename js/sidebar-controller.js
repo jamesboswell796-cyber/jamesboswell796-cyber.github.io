@@ -1,4 +1,4 @@
-const MODES = new Set(['notes', 'prompts']);
+const MODES = new Set(['notes']);
 
 function normalizeMode(mode) {
   return MODES.has(mode) ? mode : 'notes';
@@ -35,17 +35,11 @@ export function createSidebarController(options = {}) {
     options.onSearchRequest?.();
   }
 
-  function focusPromptSearch() {
-    open('prompts');
-    options.onPromptSearchRequest?.();
-  }
-
   return {
     open,
     close,
     toggle,
     focusSearch,
-    focusPromptSearch,
     getState: () => ({ ...state }),
   };
 }

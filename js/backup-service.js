@@ -1,5 +1,4 @@
-import { createBackupScheduler, readBackupBundleFromDirectory, writeBackupToDirectory } from './backup.js';
-import { collectReferencedAssetIds } from './asset-repository.js';
+import { createBackupScheduler, readBackupFromDirectory, writeBackupToDirectory } from './backup.js';
 import { createDirectoryHandleStore, ensureReadWritePermission, pickBackupDirectory } from './file-handles.js';
 
 const STATUS_TEXT = Object.freeze({
@@ -9,30 +8,16 @@ const STATUS_TEXT = Object.freeze({
   'backing-up': '正在备份…',
   'backed-up': '自动备份已完成',
   failed: '自动备份失败',
-  unsupported: '当前浏览器不支持持续写入指定文件夹；笔记仍会自动保存在本机，也可导出完整 JSON',
 });
 
 export function createBackupService(options = {}) {
   const handleStore = options.handleStore ?? createDirectoryHandleStore();
   const picker = options.picker ?? (() => pickBackupDirectory());
-  const supported = options.supported ?? (Boolean(options.picker || options.handleStore) || typeof globalThis.showDirectoryPicker === 'function');
   const ensurePermission = options.ensurePermission ?? ensureReadWritePermission;
-  const assetRepository = options.assetRepository ?? null;
-  const writer = options.writer ?? (async (handle, state) => {
-    const notes = [...state.notes, ...(state.trash ?? []).map(item => item.note)];
-    const assets = assetRepository
-      ? await assetRepository.exportRecords(collectReferencedAssetIds(notes))
-      : [];
-    return writeBackupToDirectory(handle, state, {
-      appVersion: options.appVersion ?? globalThis.chrome?.runtime?.getManifest?.().version ?? '0.0.0',
-      assets,
-    });
-  });
-  const reader = options.reader ?? (async handle => {
-    const bundle = await readBackupBundleFromDirectory(handle);
-    if (assetRepository) await assetRepository.importRecords(bundle.assets);
-    return bundle.state;
-  });
+  const writer = options.writer ?? ((handle, state) => writeBackupToDirectory(handle, state, {
+    appVersion: options.appVersion ?? globalThis.chrome?.runtime?.getManifest?.().version ?? '0.0.0',
+  }));
+  const reader = options.reader ?? readBackupFromDirectory;
   const onStatus = options.onStatus ?? (() => {});
   const schedulerFactory = options.schedulerFactory ?? (write => createBackupScheduler(write, { delay: 2500 }));
   let handle = null;
@@ -45,7 +30,6 @@ export function createBackupService(options = {}) {
   }
 
   async function init() {
-    if (!supported) return emit('unsupported');
     try {
       handle = await handleStore.get();
     } catch {
@@ -82,7 +66,6 @@ export function createBackupService(options = {}) {
   });
 
   async function connect(state) {
-    if (!supported) throw new Error(STATUS_TEXT.unsupported);
     handle = await picker();
     await handleStore.set(handle);
     emit('connected', { folderName: handle.name });
@@ -116,6 +99,5 @@ export function createBackupService(options = {}) {
     disconnect,
     getStatus: () => ({ ...currentStatus }),
     hasHandle: () => Boolean(handle),
-    isSupported: () => supported,
   };
 }

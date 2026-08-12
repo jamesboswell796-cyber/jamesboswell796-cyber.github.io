@@ -1,6 +1,5 @@
 import { createBackupSnapshot, noteBackupFilename, validateBackupSnapshot } from './backup.js';
 import { noteToMarkdown } from './note-markdown.js';
-import { collectReferencedAssetIds } from './asset-repository.js';
 
 function datePart(isoString) {
   const value = String(isoString ?? new Date().toISOString());
@@ -16,20 +15,6 @@ export function createJsonExport(state, options = {}) {
   };
 }
 
-export async function createJsonExportWithAssets(state, assetRepository, options = {}) {
-  const snapshot = createBackupSnapshot(state, options);
-  const notes = [...snapshot.state.notes, ...(snapshot.state.trash ?? []).map(item => item.note)];
-  const assets = assetRepository
-    ? await assetRepository.exportRecords(collectReferencedAssetIds(notes))
-    : [];
-  const bundle = { ...snapshot, assets };
-  return {
-    filename: `Quick-Notes-Backup-${datePart(snapshot.exportedAt)}.json`,
-    mimeType: 'application/json;charset=utf-8',
-    contents: `${JSON.stringify(bundle, null, 2)}\n`,
-  };
-}
-
 export function createMarkdownExport(note) {
   return {
     filename: noteBackupFilename(note),
@@ -40,14 +25,6 @@ export function createMarkdownExport(note) {
 
 export function parseBackupText(text) {
   return validateBackupSnapshot(JSON.parse(String(text ?? '')));
-}
-
-export function parseCompleteBackupText(text) {
-  const input = JSON.parse(String(text ?? ''));
-  return {
-    state: validateBackupSnapshot(input),
-    assets: Array.isArray(input.assets) ? input.assets : [],
-  };
 }
 
 export function downloadTextFile(file, options = {}) {
