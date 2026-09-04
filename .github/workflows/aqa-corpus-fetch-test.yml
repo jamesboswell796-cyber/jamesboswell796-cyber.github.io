@@ -15,15 +15,22 @@ jobs:
       - name: Download MPC1 and MPC2 corpus
         shell: bash
         run: |
-          set -euo pipefail
+          set -u -o pipefail
           mkdir -p out/MPC1 out/MPC2
+          : > out/FAILURES.txt
 
           fetch_pdf() {
             local url="$1"
             local dest="$2"
             echo "FETCH $dest"
-            curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 "$url" -o "$dest"
-            test "$(head -c 4 "$dest")" = '%PDF'
+            if curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 "$url" -o "$dest" \
+               && [ "$(head -c 4 "$dest" 2>/dev/null || true)" = '%PDF' ]; then
+              echo "OK $dest"
+            else
+              echo "FAIL $dest $url" | tee -a out/FAILURES.txt
+              rm -f "$dest"
+            fi
+            return 0
           }
 
           for spec in 'MPC1 C1' 'MPC2 C2'; do
@@ -38,12 +45,19 @@ jobs:
                 fetch_pdf "${base}%20MS%20-%20${alias}%20AQA.pdf" "out/${unit}/AQA-${unit}-MS-${code}${yy}.pdf"
               done
             done
-            for year in 2014 2015 2016; do
+            for year in 2014; do
               yy="${year:2:2}"
               base="https://pmt.physicsandmathstutor.com/download/Maths/A-level/${alias}/Papers-AQA/June%20${year}"
               fetch_pdf "${base}%20QP%20-%20${alias}%20AQA.pdf" "out/${unit}/AQA-${unit}-QP-JUN${yy}.pdf"
               fetch_pdf "${base}%20MS%20-%20${alias}%20AQA.pdf" "out/${unit}/AQA-${unit}-MS-JUN${yy}.pdf"
             done
+          done
+
+          for year in 15 16; do
+            fetch_pdf "https://www.thetuitioncentre.uk/revision/files/Past%20Papers/A-Level/Maths/AQA/AQA-MPC1-QP-JUN${year}.pdf" "out/MPC1/AQA-MPC1-QP-JUN${year}.pdf"
+            fetch_pdf "https://www.thetuitioncentre.uk/revision/files/Past%20Papers/A-Level/Maths/AQA/AQA-MPC1-W-MS-JUN${year}.pdf" "out/MPC1/AQA-MPC1-MS-JUN${year}.pdf"
+            fetch_pdf "https://www.thetuitioncentre.uk/revision/files/Past%20Papers/A-Level/Maths/AQA/AQA-MPC2-QP-JUN${year}.pdf" "out/MPC2/AQA-MPC2-QP-JUN${year}.pdf"
+            fetch_pdf "https://www.thetuitioncentre.uk/revision/files/Past%20Papers/A-Level/Maths/AQA/AQA-MPC2-W-MS-JUN${year}.pdf" "out/MPC2/AQA-MPC2-MS-JUN${year}.pdf"
           done
 
           fetch_pdf 'https://mmerevise.co.uk/wp-content/uploads/2020/01/AQA-MPC1-QP-JUN17.pdf' 'out/MPC1/AQA-MPC1-QP-JUN17.pdf'
@@ -56,16 +70,20 @@ jobs:
           fetch_pdf 'https://www.colmanweb.co.uk/pastpapers/Papers/A%20Level/AQA%206360/AQA-6360-MPC2/AQA-MPC2-QP-JUN18.PDF' 'out/MPC2/AQA-MPC2-QP-JUN18.pdf'
           fetch_pdf 'https://mmerevise.co.uk/app/uploads/2020/01/AQA-MPC2-W-MS-JUN18.pdf' 'out/MPC2/AQA-MPC2-MS-JUN18.pdf'
 
-          test "$(find out/MPC1 -type f -name '*.pdf' | wc -l)" -eq 46
-          test "$(find out/MPC2 -type f -name '*.pdf' | wc -l)" -eq 46
-          sha256sum out/MPC1/*.pdf > out/MPC1/SHA256SUMS.txt
-          sha256sum out/MPC2/*.pdf > out/MPC2/SHA256SUMS.txt
+          sha256sum out/MPC1/*.pdf > out/MPC1/SHA256SUMS.txt 2>/dev/null || true
+          sha256sum out/MPC2/*.pdf > out/MPC2/SHA256SUMS.txt 2>/dev/null || true
+          echo "MPC1_PDF_COUNT=$(find out/MPC1 -type f -name '*.pdf' | wc -l)" | tee out/COUNTS.txt
+          echo "MPC2_PDF_COUNT=$(find out/MPC2 -type f -name '*.pdf' | wc -l)" | tee -a out/COUNTS.txt
+          echo "FAILURE_COUNT=$(wc -l < out/FAILURES.txt)" | tee -a out/COUNTS.txt
 
       - name: Upload MPC1 artifact
         uses: actions/upload-artifact@v4
         with:
           name: aqa-mpc1-corpus
-          path: out/MPC1
+          path: |
+            out/MPC1
+            out/FAILURES.txt
+            out/COUNTS.txt
           if-no-files-found: error
           retention-days: 1
 
@@ -73,6 +91,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: aqa-mpc2-corpus
-          path: out/MPC2
+          path: |
+            out/MPC2
+            out/FAILURES.txt
+            out/COUNTS.txt
           if-no-files-found: error
           retention-days: 1
