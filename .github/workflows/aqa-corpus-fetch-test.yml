@@ -1,0 +1,35 @@
+name: AQA corpus fetch test
+
+on:
+  push:
+    branches: [aqa-corpus-fetch-test]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download two public AQA PDFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://pmt.physicsandmathstutor.com/download/Maths/A-level/C1/Papers-AQA/June%202009%20QP%20-%20C1%20AQA.pdf' \
+            -o 'out/AQA-MPC1-QP-JUN09.pdf'
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://pmt.physicsandmathstutor.com/download/Maths/A-level/C1/Papers-AQA/June%202009%20MS%20-%20C1%20AQA.pdf' \
+            -o 'out/AQA-MPC1-MS-JUN09.pdf'
+          file out/*.pdf
+          test "$(head -c 4 out/AQA-MPC1-QP-JUN09.pdf)" = '%PDF'
+          test "$(head -c 4 out/AQA-MPC1-MS-JUN09.pdf)" = '%PDF'
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aqa-mpc1-jun09-pair
+          path: out/*.pdf
+          if-no-files-found: error
+          retention-days: 1
