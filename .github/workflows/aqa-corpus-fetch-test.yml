@@ -12,24 +12,67 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
-      - name: Download two public AQA PDFs
+      - name: Download MPC1 and MPC2 corpus
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p out
-          curl -fL --retry 3 --retry-delay 2 \
-            'https://pmt.physicsandmathstutor.com/download/Maths/A-level/C1/Papers-AQA/June%202009%20QP%20-%20C1%20AQA.pdf' \
-            -o 'out/AQA-MPC1-QP-JUN09.pdf'
-          curl -fL --retry 3 --retry-delay 2 \
-            'https://pmt.physicsandmathstutor.com/download/Maths/A-level/C1/Papers-AQA/June%202009%20MS%20-%20C1%20AQA.pdf' \
-            -o 'out/AQA-MPC1-MS-JUN09.pdf'
-          file out/*.pdf
-          test "$(head -c 4 out/AQA-MPC1-QP-JUN09.pdf)" = '%PDF'
-          test "$(head -c 4 out/AQA-MPC1-MS-JUN09.pdf)" = '%PDF'
-      - name: Upload artifact
+          mkdir -p out/MPC1 out/MPC2
+
+          fetch_pdf() {
+            local url="$1"
+            local dest="$2"
+            echo "FETCH $dest"
+            curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 "$url" -o "$dest"
+            test "$(head -c 4 "$dest")" = '%PDF'
+          }
+
+          for spec in 'MPC1 C1' 'MPC2 C2'; do
+            set -- $spec
+            unit="$1"; alias="$2"
+            for year in 2005 2006 2007 2008 2009 2010 2011 2012 2013; do
+              yy="${year:2:2}"
+              for season in January June; do
+                if [ "$season" = January ]; then code=JAN; else code=JUN; fi
+                base="https://pmt.physicsandmathstutor.com/download/Maths/A-level/${alias}/Papers-AQA/${season}%20${year}"
+                fetch_pdf "${base}%20QP%20-%20${alias}%20AQA.pdf" "out/${unit}/AQA-${unit}-QP-${code}${yy}.pdf"
+                fetch_pdf "${base}%20MS%20-%20${alias}%20AQA.pdf" "out/${unit}/AQA-${unit}-MS-${code}${yy}.pdf"
+              done
+            done
+            for year in 2014 2015 2016; do
+              yy="${year:2:2}"
+              base="https://pmt.physicsandmathstutor.com/download/Maths/A-level/${alias}/Papers-AQA/June%20${year}"
+              fetch_pdf "${base}%20QP%20-%20${alias}%20AQA.pdf" "out/${unit}/AQA-${unit}-QP-JUN${yy}.pdf"
+              fetch_pdf "${base}%20MS%20-%20${alias}%20AQA.pdf" "out/${unit}/AQA-${unit}-MS-JUN${yy}.pdf"
+            done
+          done
+
+          fetch_pdf 'https://mmerevise.co.uk/wp-content/uploads/2020/01/AQA-MPC1-QP-JUN17.pdf' 'out/MPC1/AQA-MPC1-QP-JUN17.pdf'
+          fetch_pdf 'https://colmanweb.co.uk/pastpapers/Papers/A%20Level/AQA%206360/AQA-6360-MPC1/AQA-MPC1-W-MS-JUN17.PDF' 'out/MPC1/AQA-MPC1-MS-JUN17.pdf'
+          fetch_pdf 'https://mmerevise.co.uk/app/uploads/2020/01/AQA-MPC1-QP-JUN18.pdf' 'out/MPC1/AQA-MPC1-QP-JUN18.pdf'
+          fetch_pdf 'https://mmerevise.co.uk/app/uploads/2020/01/AQA-MPC1-W-MS-JUN18.pdf' 'out/MPC1/AQA-MPC1-MS-JUN18.pdf'
+
+          fetch_pdf 'https://mmerevise.co.uk/app/uploads/2020/01/AQA-MPC2-QP-JUN17.pdf' 'out/MPC2/AQA-MPC2-QP-JUN17.pdf'
+          fetch_pdf 'https://www.a-levelpastpapers.co.uk/uploads/9/6/0/2/96027112/aqa_mathematics_core_2_mark_scheme_jun_2017.pdf' 'out/MPC2/AQA-MPC2-MS-JUN17.pdf'
+          fetch_pdf 'https://www.colmanweb.co.uk/pastpapers/Papers/A%20Level/AQA%206360/AQA-6360-MPC2/AQA-MPC2-QP-JUN18.PDF' 'out/MPC2/AQA-MPC2-QP-JUN18.pdf'
+          fetch_pdf 'https://mmerevise.co.uk/app/uploads/2020/01/AQA-MPC2-W-MS-JUN18.pdf' 'out/MPC2/AQA-MPC2-MS-JUN18.pdf'
+
+          test "$(find out/MPC1 -type f -name '*.pdf' | wc -l)" -eq 46
+          test "$(find out/MPC2 -type f -name '*.pdf' | wc -l)" -eq 46
+          sha256sum out/MPC1/*.pdf > out/MPC1/SHA256SUMS.txt
+          sha256sum out/MPC2/*.pdf > out/MPC2/SHA256SUMS.txt
+
+      - name: Upload MPC1 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: aqa-mpc1-jun09-pair
-          path: out/*.pdf
+          name: aqa-mpc1-corpus
+          path: out/MPC1
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload MPC2 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aqa-mpc2-corpus
+          path: out/MPC2
           if-no-files-found: error
           retention-days: 1
