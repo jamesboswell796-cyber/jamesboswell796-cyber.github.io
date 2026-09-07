@@ -1,6 +1,6 @@
 import { createIndexedDbStorageArea } from '../js/web-storage.js';
 
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 const storageArea = createIndexedDbStorageArea({ dbName: 'quickNotesMenubarX' });
 
 globalThis.__QUICK_NOTES_RUNTIME__ = {
@@ -10,13 +10,12 @@ globalThis.__QUICK_NOTES_RUNTIME__ = {
   draftKey: 'quickNotesMenubarXEmergencyDraft',
   appVersion: `menubarx-${VERSION}`,
   versionLabel: `Web ${VERSION}`,
-  initialDrawerExpanded: true,
   onReady() {
     document.documentElement.classList.add('is-ready');
   },
 };
 
-await import('../js/editor.js');
+await import('./app.js');
 
 if ('serviceWorker' in navigator && globalThis.isSecureContext) {
   navigator.serviceWorker.register('./service-worker.js').catch(() => {});
