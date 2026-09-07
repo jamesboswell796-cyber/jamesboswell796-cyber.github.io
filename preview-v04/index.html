@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN" data-runtime="web">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>随手记 · MenubarX V0.4 Preview</title>
+  <meta name="theme-color" content="#f4f3ef">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="../icons/icon48.png">
+  <link rel="apple-touch-icon" href="../icons/icon128.png">
+  <link rel="stylesheet" href="../css/writing.css">
+  <link rel="stylesheet" href="menubarx.css">
+</head>
+<body>
+  <main id="menubar-app" class="menubar-app" data-view="shelf">
+    <section id="shelf-view" class="app-view shelf-view" aria-label="随手记列表">
+      <header class="shelf-header">
+        <div class="brand-row"><div class="brand-copy"><strong>随手记</strong><span id="note-count" class="quiet-meta"></span></div><div class="header-actions"><button id="new-note" class="icon-action primary-icon" type="button" title="新建" aria-label="新建笔记">＋</button><button id="settings-button" class="icon-action" type="button" title="设置" aria-label="设置">⋯</button></div></div>
+        <label class="search-box" for="note-search"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/></svg><input id="note-search" type="search" placeholder="搜索标题或内容" autocomplete="off" spellcheck="false"><kbd>⌘K</kbd></label>
+      </header>
+      <div id="note-list" class="note-list" role="list"></div><div id="note-empty" class="empty-state" hidden>没有匹配的内容</div>
+    </section>
+    <section id="read-view" class="app-view read-view" aria-label="阅读笔记" hidden><header class="detail-header"><button id="read-back" class="text-action back-action" type="button">‹ 返回</button><div class="detail-actions"><button id="read-copy" class="text-action primary-action" type="button">复制</button><button id="read-edit" class="text-action" type="button">编辑</button><button id="read-delete" class="text-action danger-text" type="button">删除</button></div></header><div class="read-scroll"><h1 id="read-title" class="note-title"></h1><article id="read-body" class="markdown-preview"></article></div></section>
+    <section id="edit-view" class="app-view edit-view" aria-label="编辑笔记" hidden><header class="detail-header edit-header"><button id="edit-back" class="text-action back-action" type="button">‹ 完成</button><span id="save-status" class="save-status">已保存</span><button id="edit-copy" class="text-action primary-action" type="button">复制</button></header><div class="edit-fields"><input id="edit-title" class="edit-title" type="text" maxlength="80" placeholder="笔记名称" autocomplete="off" spellcheck="true" aria-label="笔记名称"><div id="source-toolbar" class="source-toolbar" role="toolbar" aria-label="Markdown 快捷格式"><button type="button" data-prefix="# " title="一级标题">H1</button><button type="button" data-prefix="## " title="二级标题">H2</button><button type="button" data-prefix="### " title="三级标题">H3</button><span class="toolbar-separator" aria-hidden="true"></span><button type="button" data-wrap="**" title="加粗"><strong>B</strong></button><button type="button" data-wrap="*" title="斜体"><em>I</em></button><button type="button" data-wrap="`" title="行内代码">&lt;/&gt;</button><span class="toolbar-separator" aria-hidden="true"></span><button type="button" data-prefix="- " title="项目列表">•</button><button type="button" data-prefix="1. " title="编号列表">1.</button><button type="button" data-prefix="> " title="引用">❝</button><button type="button" data-insert="divider" title="分隔线">—</button></div><textarea id="edit-body" class="source-editor" placeholder="直接写点什么……" spellcheck="true" aria-label="Markdown 正文"></textarea></div></section>
+    <div id="copy-toast" class="copy-toast" role="status" aria-live="polite" hidden>已复制</div>
+    <dialog id="settings-dialog" class="settings-dialog"><form method="dialog" class="settings-panel"><header class="settings-header"><div><strong>设置与备份</strong><p>这是 V0.4 Preview，使用独立本地数据库。</p></div><button value="close" class="close-button" aria-label="关闭">×</button></header><section class="settings-section"><div class="section-copy"><strong>本地自动备份</strong><p id="backup-status">尚未连接备份目录</p></div><div class="button-row"><button id="connect-backup" type="button">选择目录</button><button id="backup-now" type="button">立即备份</button><button id="restore-backup" type="button">从目录恢复</button><button id="disconnect-backup" type="button">断开</button></div></section><section class="settings-section"><div class="section-copy"><strong>安全快照</strong><p>删除、导入和恢复前自动留底；最多保留 8 份。</p></div><div class="button-row"><button id="create-snapshot" type="button">立即留一份</button></div><div id="snapshot-list" class="compact-list"></div></section><section class="settings-section"><div class="section-copy"><strong>回收站</strong><p id="trash-summary">0 条</p></div><div id="trash-list" class="compact-list"></div><div class="button-row"><button id="empty-trash" type="button" class="danger-soft">清空回收站</button></div></section><section class="settings-section"><div class="section-copy"><strong>导入与导出</strong><p>JSON 用于完整恢复；Markdown 导出当前笔记。</p></div><div class="button-row"><button id="export-json" type="button">导出完整 JSON</button><button id="export-markdown" type="button">导出当前 Markdown</button><button id="import-json" type="button">导入 JSON</button><input id="import-json-input" type="file" accept="application/json,.json" hidden></div></section><footer class="settings-footer"><span id="version">Web 0.4.0 Preview</span><span>独立测试数据</span></footer></form></dialog>
+  </main>
+  <script type="module" src="menubarx.js"></script>
+</body>
+</html>
