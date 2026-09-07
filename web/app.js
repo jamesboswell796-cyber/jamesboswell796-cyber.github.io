@@ -79,6 +79,7 @@ let state;
 let view = 'shelf';
 let copyToastTimer = null;
 let editRenderNoteId = null;
+let titleDirty = false;
 
 function activeNote() {
   return state?.notes.find(note => note.id === state.activeNoteId) ?? state?.notes[0] ?? null;
@@ -116,7 +117,7 @@ const saver = createDebouncedSaver(async nextState => {
     state = await repository.saveState(nextState);
     draftCache.clear();
     backupService.schedule(state);
-    setSaveStatus('已保存');
+    setSaveStatus(titleDirty ? '标题未保存' : '已保存');
   } catch {
     setSaveStatus('保存失败');
   }
@@ -136,11 +137,30 @@ async function replaceState(nextState, message) {
   draftCache.clear();
   backupService.schedule(state);
   editRenderNoteId = null;
+  titleDirty = false;
   setSaveStatus(message);
   renderCurrentView();
 }
 
+function markTitleDirty() {
+  titleDirty = true;
+  setSaveStatus('标题未保存');
+}
+
+function commitTitleDraft() {
+  if (!titleDirty) return false;
+  const note = activeNote();
+  if (!note) return false;
+  state = updateNoteTitle(state, note.id, elements.editTitle.value);
+  elements.editTitle.value = activeNote().title;
+  titleDirty = false;
+  setSaveStatus('保存中…');
+  saver.schedule(state);
+  return true;
+}
+
 function setView(nextView, { focus = false } = {}) {
+  if (view === 'edit' && nextView !== 'edit') commitTitleDraft();
   view = nextView;
   elements.app.dataset.view = view;
   elements.shelf.hidden = view !== 'shelf';
@@ -205,6 +225,7 @@ function renderEdit({ force = false } = {}) {
   if (!note) return;
   if (!force && editRenderNoteId === note.id) return;
   editRenderNoteId = note.id;
+  titleDirty = false;
   elements.editTitle.value = note.title;
   elements.editBody.value = sourceForEdit(note);
 }
@@ -287,15 +308,6 @@ function updateBodyFromEditor() {
   const note = activeNote();
   if (!note) return;
   state = updateNoteBody(state, note.id, elements.editBody.value);
-  setSaveStatus('保存中…');
-  saver.schedule(state);
-}
-
-function updateTitleFromEditor() {
-  const note = activeNote();
-  if (!note) return;
-  state = updateNoteTitle(state, note.id, elements.editTitle.value);
-  elements.editTitle.value = activeNote().title;
   setSaveStatus('保存中…');
   saver.schedule(state);
 }
@@ -383,6 +395,7 @@ async function openSettings() {
 
 async function preserveOnClose() {
   if (!state) return;
+  commitTitleDraft();
   draftCache.save(state);
   await saver.flush();
 }
@@ -412,13 +425,15 @@ elements.readEdit.addEventListener('click', () => {
 });
 elements.readDelete.addEventListener('click', deleteActiveNote);
 elements.editBack.addEventListener('click', async () => {
+  commitTitleDraft();
   await saver.flush();
   editRenderNoteId = null;
   setView('read');
 });
 elements.editCopy.addEventListener('click', () => copyNote());
 elements.editBody.addEventListener('input', updateBodyFromEditor);
-elements.editTitle.addEventListener('input', updateTitleFromEditor);
+elements.editTitle.addEventListener('input', markTitleDirty);
+elements.editTitle.addEventListener('blur', commitTitleDraft);
 elements.sourceToolbar.addEventListener('pointerdown', event => {
   if (event.target.closest('button')) event.preventDefault();
 });
