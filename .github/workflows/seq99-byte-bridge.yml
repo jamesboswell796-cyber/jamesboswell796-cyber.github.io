@@ -1,0 +1,39 @@
+name: seq99-byte-bridge
+
+on:
+  push:
+    branches:
+      - chatgpt-seq99-byte-bridge
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch-exact-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download exact clean source PDFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          curl -L --fail --retry 4 --retry-all-errors --connect-timeout 20 \
+            -o out/9709_m26_qp_42.pdf \
+            "https://ayazrao.com/wp-content/uploads/2026/09/9709_m26_qp_42.pdf"
+          curl -L --fail --retry 4 --retry-all-errors --connect-timeout 20 \
+            -o out/9709_m26_ms_42.pdf \
+            "https://ayazrao.com/wp-content/uploads/2026/09/9709_m26_ms_42.pdf"
+          test "$(head -c 5 out/9709_m26_qp_42.pdf)" = "%PDF-"
+          test "$(head -c 5 out/9709_m26_ms_42.pdf)" = "%PDF-"
+          sha256sum out/9709_m26_qp_42.pdf out/9709_m26_ms_42.pdf | tee out/SHA256SUMS.txt
+          wc -c out/9709_m26_qp_42.pdf out/9709_m26_ms_42.pdf | tee out/SIZES.txt
+
+      - name: Upload exact source pair
+        uses: actions/upload-artifact@v4
+        with:
+          name: seq99-exact-source-pair
+          path: out/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
