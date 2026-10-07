@@ -1,0 +1,46 @@
+name: b11b-byte-bridge
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch-official-ocr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download official OCR source PDFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          curl -L --fail --retry 4 --retry-all-errors -o out/172_qp.pdf "https://www.ocr.org.uk/Images/643229-question-paper-mechanics-major.pdf"
+          curl -L --fail --retry 4 --retry-all-errors -o out/172_ms.pdf "https://www.ocr.org.uk/Images/643245-mark-scheme-mechanics-major.pdf"
+          curl -L --fail --retry 4 --retry-all-errors -o out/173_qp.pdf "https://www.ocr.org.uk/Images/676828-question-paper-mechanics-major.pdf"
+          curl -L --fail --retry 4 --retry-all-errors -o out/173_ms.pdf "https://www.ocr.org.uk/Images/676997-mark-scheme-mechanics-major.pdf"
+          curl -L --fail --retry 4 --retry-all-errors -o out/174_qp.pdf "https://www.ocr.org.uk/Images/703849-question-paper-mechanics-major.pdf"
+          curl -L --fail --retry 4 --retry-all-errors -o out/174_ms.pdf "https://www.ocr.org.uk/Images/704000-mark-scheme-mechanics-major.pdf"
+          curl -L --fail --retry 4 --retry-all-errors -o out/175_qp.pdf "https://www.ocr.org.uk/Images/726637-question-paper-mechanics-major.pdf"
+          curl -L --fail --retry 4 --retry-all-errors -o out/175_ms.pdf "https://www.ocr.org.uk/Images/726788-mark-scheme-mechanics-major.pdf"
+          curl -L --fail --retry 4 --retry-all-errors -o out/177_qp.pdf "https://www.ocr.org.uk/Images/242381-question-paper-unit-4763-01-mechanics-3.pdf"
+          curl -L --fail --retry 4 --retry-all-errors -o out/177_ms.pdf "https://www.ocr.org.uk/Images/235953-mark-scheme-unit-4763-mechanics-3-june.pdf"
+          curl -L --fail --retry 4 --retry-all-errors -o out/178_qp.pdf "https://www.ocr.org.uk/Images/319299-question-paper-mechanics-3.pdf"
+          curl -L --fail --retry 4 --retry-all-errors -o out/178_ms.pdf "https://www.ocr.org.uk/Images/320081-mark-scheme-unit-4763-mechanics-3-june.pdf"
+          curl -L --fail --retry 4 --retry-all-errors -o out/179_qp.pdf "https://www.ocr.org.uk/Images/471792-question-paper-mechanics-3.pdf"
+          curl -L --fail --retry 4 --retry-all-errors -o out/179_ms.pdf "https://www.ocr.org.uk/Images/472755-mark-scheme-mechanics-3.pdf"
+          for f in out/*.pdf; do
+            test "$(head -c 5 "$f")" = "%PDF-"
+          done
+          sha256sum out/*.pdf | sort | tee out/SHA256SUMS.txt
+          wc -c out/*.pdf | sort -k2 | tee out/SIZES.txt
+      - name: Upload official source pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: b11b-official-ocr-source-pack
+          path: out/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
