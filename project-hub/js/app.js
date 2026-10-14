@@ -1,5 +1,6 @@
 import {copyText} from './legacy/clipboard.js';
-import {normalizeItem,sortedItems,projectPrompt,aiEditRequest,parseAIPatch,parseBackup,createBackup} from './model.js';
+import {normalizeItem,sortedItems,projectPrompt,parseBackup,createBackup} from './model.js';
+import {aiEditRequest,parseAIPatch,AI_DEFAULT_GUIDANCE} from './ai-protocol.js';
 import {LocalRepository,SupabaseRepository} from './repository.js';
 
 const $=id=>document.getElementById(id);
@@ -8,6 +9,8 @@ const cloud=Boolean(config.supabaseUrl && config.supabaseAnonKey);
 const repo=cloud ? new SupabaseRepository(config) : new LocalRepository();
 let items=[], editing=null, activeFilter='all', aiPending=null, backupPending=null, saving=false, toastTimer=null;
 const themeKey='project-hub-theme';
+const aiGuidanceKey='project-hub-ai-guidance-v1';
+function getAiGuidance(){ return localStorage.getItem(aiGuidanceKey)||AI_DEFAULT_GUIDANCE; }
 
 function toast(message){const el=$('toast');el.textContent=message;el.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('visible'),2800);}
 function notifyError(err){console.error(err);toast(err?.message||'操作失败');}
@@ -31,23 +34,30 @@ async function reload(){
   try{items=await repo.list();render();updateStatus();}
   catch(err){items=[];render();notifyError(err);if(cloud){repo.logout();show('authDialog');}}
 }
+function closeMenus(){ document.querySelectorAll('.card-menu[open]').forEach(menu=>menu.open=false); }
 function card(item){
-  const article=el('article','prompt-card');article.dataset.id=item.id;
+  const article=el('article','prompt-card'); article.dataset.id=item.id;
   const main=btn('card-main',`复制${item.kind==='project'?'临时调用词':'提示词'}：${item.title}`,'',()=>copyItem(item));
-  const labels=el('div','card-topline');labels.append(el('span',`type-tag ${item.kind}`,item.kind==='project'?'◇ 项目入口':'✧ 提示词'));
-  if(item.pinned)labels.append(el('span','pinned-label','⌁ 已置顶'));
-  main.append(labels,el('div','card-title',item.title),el('div','card-summary',item.summary || (item.kind==='project'?'读取项目规范，快速开始':'一键复制，随时开始')));
-  const bottom=el('div','card-bottom');bottom.append(el('span','card-hint','↳ 点击卡片复制'));
+  if(item.pinned) main.append(el('span','pinned-label','📌 置顶'));
+  main.append(el('div','card-title',item.title),el('div','card-summary',item.summary|| (item.kind==='project'?'点击复制项目临时调用词':'点击复制提示词')));
+  const bottom=el('div','card-bottom');
+  bottom.append(el('span','card-hint',item.kind==='project'?'◇ 项目入口':'轻点卡片复制'));
   const tools=el('div','card-tools');
-  if(item.kind==='project'){
-    tools.append(btn('tool handoff','复制正式接手 Worker 提示词','接手',()=>copyItem(item,'handoff')));
-    tools.append(btn('tool external','打开项目入口','↗',()=>window.open(item.entry_url,'_blank','noopener,noreferrer')));
-  }
   tools.append(btn(`tool${item.starred?' star-active':''}`,item.starred?'取消收藏':'加入收藏',item.starred?'★':'☆',()=>changeFlag(item,'starred')));
-  tools.append(btn(`tool${item.pinned?' pin-active':''}`,item.pinned?'取消置顶':'置顶','📌',()=>changeFlag(item,'pinned')));
-  tools.append(btn('tool','编辑此记录','✎',()=>openEdit(item)));
+  tools.append(btn('tool tool-ai','复制给 AI 修改','✧ AI',()=>copyForAI(item)));
+  if(item.kind==='project')tools.append(btn('tool handoff','复制正式接手 Worker 提示词','接手',()=>copyItem(item,'handoff')));
+  const menu=el('details','card-menu');
+  const summary=el('summary','tool menu-trigger','···');summary.title='更多操作';summary.setAttribute('aria-label','更多操作');
+  summary.addEventListener('click',e=>{e.stopPropagation();const wasOpen=menu.open;closeMenus(); if(wasOpen)menu.open=true;});
+  const options=el('div','menu-popover');
+  const opt=(name,label,run)=>options.append(btn('menu-option',name,label,()=>{menu.open=false;run();}));
+  opt('编辑','✎ 编辑',()=>openEdit(item));
+  opt('置顶',item.pinned?'取消置顶':'📌 置顶',()=>changeFlag(item,'pinned'));
+  if(item.kind==='project')opt('打开项目入口','↗ 打开入口',()=>window.open(item.entry_url,'_blank','noopener,noreferrer'));
+  menu.append(summary,options);tools.append(menu);
   bottom.append(tools);article.append(main,bottom);return article;
 }
+
 function render(){
   const q=$('search').value;const list=sortedItems(items,q,activeFilter==='star');
   $('allCount').textContent=items.length;$('starCount').textContent=items.filter(x=>x.starred).length;
@@ -90,10 +100,12 @@ async function deleteEdit(){if(!editing)return;
   try{await repo.remove(editing);items=items.filter(v=>v.id!==editing.id);render();hide('editDialog');toast('已删除');}
   catch(err){notifyError(err);}
 }
-async function copyForAI(){if(!editing)return;
-  try{await copyText(aiEditRequest(editing));toast('✓ 已复制 AI 编辑请求');}
-  catch{ $('manualCopyText').value=aiEditRequest(editing);show('manualCopyDialog');$('manualCopyText').select();}
+async function copyForAI(item=editing){if(!item)return;
+  const request=aiEditRequest(item,getAiGuidance());
+  try{await copyText(request);toast('✓ 已复制 AI 修改请求，直接粘贴给 ChatGPT 即可');}
+  catch{$('manualCopyText').value=request;show('manualCopyDialog');$('manualCopyText').select();}
 }
+
 function previewItems(target,records,kind){
   target.replaceChildren();
   const labels={title:'标题',body:'正文',summary:'简介',kind:'类型',entry_url:'入口',current_url:'Current',starred:'收藏',pinned:'置顶'};
@@ -164,9 +176,13 @@ $('newBtn').addEventListener('click',()=>openEdit());$('emptyNew').addEventListe
 $('allFilter').addEventListener('click',()=>{activeFilter='all';render();});
 $('starFilter').addEventListener('click',()=>{activeFilter='star';render();});
 $('themeBtn').addEventListener('click',toggleTheme);$('settingsThemeBtn').addEventListener('click',toggleTheme);
-$('settingsBtn').addEventListener('click',()=>show('settingsDialog'));$('aiBtn').addEventListener('click',openAI);
+$('settingsBtn').addEventListener('click',()=>{$('aiGuidance').value=getAiGuidance();show('settingsDialog');});$('aiBtn').addEventListener('click',openAI);
 $('editForm').addEventListener('submit',saveEdit);$('editForm').addEventListener('change',e=>{if(e.target.name==='kind')setKind(e.target.value);});
-$('deleteBtn').addEventListener('click',deleteEdit);$('copyForAIBtn').addEventListener('click',copyForAI);
+$('deleteBtn').addEventListener('click',deleteEdit);$('copyForAIBtn').addEventListener('click',()=>copyForAI(editing));
+$('saveAiGuidanceBtn').addEventListener('click',()=>{const v=$('aiGuidance').value.trim();if(!v){toast('偏好不能为空，可选择恢复默认');return;}localStorage.setItem(aiGuidanceKey,v);toast('✓ AI 编辑偏好已保存');});
+$('resetAiGuidanceBtn').addEventListener('click',()=>{$('aiGuidance').value=AI_DEFAULT_GUIDANCE;localStorage.removeItem(aiGuidanceKey);toast('✓ 已恢复默认');});
+document.addEventListener('click',e=>{if(!e.target.closest('.card-menu'))closeMenus();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenus();});
 $('previewAiBtn').addEventListener('click',previewAI);$('applyAiBtn').addEventListener('click',applyAI);
 $('aiInput').addEventListener('input',()=>{$('applyAiBtn').disabled=true;aiPending=null;});
 $('exportBtn').addEventListener('click',downloadBackup);$('importBtn').addEventListener('click',()=>$('backupFile').click());$('backupFile').addEventListener('change',readBackupFile);$('applyBackupBtn').addEventListener('click',applyBackup);

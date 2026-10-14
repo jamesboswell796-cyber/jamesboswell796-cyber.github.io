@@ -5,3 +5,22 @@
 :root[data-theme="dark"]{color-scheme:dark;--bg:#171e1b;--surface:#222b26;--ink:#e4ece5;--muted:#9dab9e;--line:#35433a;--accent:#86aa90;--accent-soft:#33473a;--gold:#dfb678;--shadow:none} :root[data-theme="dark"] .brand-icon{background:#406950}:root[data-theme="dark"] .primary-button{color:#15251a;background:#a2c0a9;border-color:#a2c0a9}:root[data-theme="dark"] .primary-button:hover{background:#b5ceba}:root[data-theme="dark"] .type-tag{background:#365040;color:#add0b6}:root[data-theme="dark"] .type-tag.prompt{background:#4d4132;color:#ddbd93}:root[data-theme="dark"] .empty{background:#1f2923}:root[data-theme="dark"] .sync-notice{background:#342d1e;border-color:#6b5636;color:#ddbe86}:root[data-theme="dark"] .tool.handoff{color:#bcddc5}:root[data-theme="dark"] .toast{background:#b5d2bd;color:#14251a}
 
 .diff-line{margin-top:9px;padding-top:7px;border-top:1px dashed var(--line)}.diff-name{font-weight:700;color:var(--accent);margin-bottom:4px}.before-after{white-space:pre-wrap;line-height:1.5}.before-after.after{color:var(--ink)}
+
+/* v0.2 quiet compact layout and discoverable AI editing */
+.topbar{height:72px}.content{padding:24px 0 35px}.toolbar .primary-button,.searchbox{height:48px}
+.filterbar{margin-top:19px;margin-bottom:13px}.filter{padding-bottom:12px}.text-action{padding-bottom:12px}
+.prompt-card{min-height:117px;border-radius:14px;overflow:visible;box-shadow:none}
+.prompt-card:hover{transform:none;box-shadow:0 5px 22px rgba(38,67,48,.045)}
+.card-main{min-height:74px;padding:16px 18px 11px}.card-title{font-size:15px;margin-bottom:4px}
+.card-summary{font-size:12px;min-height:0}.card-bottom{padding:5px 11px 5px 17px;min-height:41px}
+.card-tools{align-items:center}.card-menu{position:relative}.menu-trigger{list-style:none;display:grid;place-items:center;font-weight:750;font-size:20px;line-height:1}
+.menu-trigger::-webkit-details-marker{display:none}.menu-popover{position:absolute;z-index:20;min-width:150px;right:0;top:36px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:5px;box-shadow:0 12px 35px rgba(18,38,26,.14)}
+.menu-option{display:block;width:100%;border:0;background:transparent;color:var(--ink);text-align:left;padding:9px 10px;border-radius:8px;font-size:12px}
+.menu-option:hover{background:var(--accent-soft)}.tool-ai{font-size:11px;font-weight:650;min-width:42px}
+.pinned-label{display:block;float:right;margin-left:8px}.cards{gap:12px}.sheet-dialog textarea{max-width:100%}
+@media(max-width:720px){.topbar{height:62px}.content{padding-top:17px}.prompt-card{min-height:108px}}
+@media(max-width:420px){.card-main{padding:13px 14px 9px}.card-bottom{padding:5px 9px}.card-hint{font-size:10px}.tool-ai{font-size:10px}}
+/* Comfortable tap targets for MenuBarX and touch screens. */
+.card-tools .tool,.menu-trigger{min-height:38px;min-width:38px}
+.card-tools .handoff{min-width:44px}.card-tools .tool-ai{min-width:50px}
+@media(max-width:420px){.card-bottom{padding-top:4px;padding-bottom:4px}.card-tools{gap:0}}
