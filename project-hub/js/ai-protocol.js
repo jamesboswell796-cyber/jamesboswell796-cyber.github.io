@@ -28,7 +28,9 @@ export function aiEditRequest(item, guidance = AI_DEFAULT_GUIDANCE) {
 
 export function parseAIPatch(raw, items) {
   let data;
-  try { data = JSON.parse(raw); } catch { throw new Error('内容不是有效 JSON，请复制 AI 返回的 JSON 对象'); }
+  const cleaned=String(raw).trim().replace(/^```(?:json)?\s*\n([\s\S]*?)\n```$/i,'$1');
+  if(cleaned.length>4*1024*1024)throw Error('修改包超过 4 MB，请拆分为多个批次');
+  try { data = JSON.parse(cleaned); } catch { throw new Error('内容不是有效 JSON，请复制 AI 返回的 JSON 对象'); }
   if (!isPatchObject(data) || ![AI_SCHEMA,'project-hub.patch.v1'].includes(data.schema) || !Array.isArray(data.changes) || !data.changes.length || data.changes.length > 100) {
     throw new Error(`需要 ${AI_SCHEMA} 格式，包含 1–100 条 changes`);
   }
@@ -36,6 +38,9 @@ export function parseAIPatch(raw, items) {
   const seen = new Set();
   return data.changes.map((change, index) => {
     if (!isPatchObject(change) || !['update','create'].includes(change.action)) throw new Error(`第 ${index+1} 条 action 只能是 update/create`);
+    const allowedFields=['title','body','kind','summary','entry_url','current_url'];
+    const unknown=Object.keys(change).filter(k=>!['action','id','base_revision',...allowedFields].includes(k));
+    if(unknown.length)throw Error('包含不可写字段：'+unknown.join(', '));
     const id = patchText(change.id);
     if (change.action === 'update' && !id) throw new Error('更新必须填写现有记录 ID');
     if (change.action === 'create' && id) throw new Error('新建记录请省略 id，避免误覆盖');

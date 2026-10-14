@@ -1,18 +1,64 @@
 import {copyText} from './legacy/clipboard.js';
 import {normalizeItem,sortedItems,projectPrompt,parseBackup,createBackup} from './model.js';
 import {aiEditRequest,parseAIPatch,AI_DEFAULT_GUIDANCE} from './ai-protocol.js';
-import {LocalRepository,SupabaseRepository} from './repository.js';
+import {LocalRepository,SupabaseRepository,generateId} from './repository.js';
 
 const $=id=>document.getElementById(id);
 const config=window.PROJECT_HUB_CONFIG||{};
 const cloud=Boolean(config.supabaseUrl && config.supabaseAnonKey);
 const repo=cloud ? new SupabaseRepository(config) : new LocalRepository();
-let items=[], editing=null, activeFilter='all', aiPending=null, backupPending=null, saving=false, toastTimer=null;
+let items=[], editing=null, activeFilter='all', aiPending=null, backupPending=null, saving=false, toastTimer=null, previewTimer=null;
+const undoStack=[];
 const themeKey='project-hub-theme';
 const aiGuidanceKey='project-hub-ai-guidance-v1';
 function getAiGuidance(){ return localStorage.getItem(aiGuidanceKey)||AI_DEFAULT_GUIDANCE; }
 
-function toast(message){const el=$('toast');el.textContent=message;el.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('visible'),2800);}
+function toast(message, undo=false){
+  const area=$('toast');area.replaceChildren(document.createTextNode(message));
+  if(undo&&undoStack.length){ const button=el('button','toast-undo','撤销');button.type='button';button.addEventListener('click',undoLast);area.append(button); }
+  area.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>area.classList.remove('visible'),undo?9500:3300);
+}
+function updateUndoButton(){const button=$('undoSettingsBtn');if(button)button.disabled=!undoStack.length;}
+function snapshot(row){return row ? {kind:row.kind,title:row.title,body:row.body,summary:row.summary,entry_url:row.entry_url,current_url:row.current_url,starred:row.starred,pinned:row.pinned} : null;}
+async function commitOperations(ops,message,{trackUndo=true}={}){
+  if(saving)throw Error('有操作正在保存，请完成后再试');
+  saving=true;
+  try{
+    const before=new Map(items.map(r=>[r.id,{...r}]));
+    const result=await repo.applyBatch(ops);const current=new Map(items.map(r=>[r.id,r]));
+    for(const change of result){if(change.action==='delete')current.delete(change.id);else current.set(change.id,change.row);}
+    items=[...current.values()];render();
+    if(trackUndo){
+      const inverse=[];
+      for(const change of result.slice().reverse()){
+        const previous=before.get(change.id);
+        if(change.action==='create')inverse.push({action:'delete',id:change.id,base_revision:change.row.revision});
+        if(change.action==='update')inverse.push({action:'update',id:change.id,base_revision:change.row.revision,record:snapshot(previous)});
+        if(change.action==='delete')inverse.push({action:'create',id:change.id,record:snapshot(previous)});
+      }
+      undoStack.push(inverse);if(undoStack.length>5)undoStack.shift();updateUndoButton();
+    }
+    if(message)toast(message,trackUndo);
+    return result;
+  }finally{saving=false;}
+}
+async function undoLast(){
+  if(saving||!undoStack.length)return;
+  const inverse=undoStack.at(-1);
+  try{
+    const changes=await commitOperations(inverse,'↶ 已撤销最近一次操作',{trackUndo:false});
+    undoStack.pop();
+    // Earlier undo checkpoints for the same record must track its new revision.
+    for(const change of changes){
+      for(let i=undoStack.length-1;i>=0;i--){
+        const prior=undoStack[i].find(op=>op.id===change.id);
+        if(prior){if(prior.action!=='create'&&change.row)prior.base_revision=change.row.revision;break;}
+      }
+    }
+    updateUndoButton();
+  }
+  catch(err){notifyError(err);toast('无法安全撤销：数据已变化，请刷新查看');}
+}
 function notifyError(err){console.error(err);toast(err?.message||'操作失败');}
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
 function btn(className,title,text,action){const b=el('button',className,text);b.type='button';b.title=title;b.setAttribute('aria-label',title);b.addEventListener('click',e=>{e.stopPropagation();action();});return b;}
@@ -67,13 +113,12 @@ function render(){
   $('emptySub').textContent=items.length===0?'点击「新建」，添加你的第一条提示词。':activeFilter==='star'?'为常用卡片点亮星标，它们会出现在这里。':'换个关键词试试，或者创建新提示词。';
   $('emptyNew').hidden=items.length>0;
 }
-async function write(record, original=null){
-  if(saving)throw Error('上一项操作尚未完成');
-  saving=true;
-  try{const row=await repo.save(record,original);const ix=items.findIndex(v=>v.id===row.id);if(ix<0)items.push(row);else items[ix]=row;render();return row;}
-  finally{saving=false;}
+async function write(record, original=null, label='✓ 已保存'){
+  const id=original?.id||record.id||generateId();
+  const [result]=await commitOperations([{action:original?'update':'create',id,base_revision:original?.revision,record}],label);
+  return result.row;
 }
-async function changeFlag(item,key){try{await write({...item,[key]:!item[key]},item);toast(key==='starred'?'收藏已更新':'置顶已更新');}catch(err){notifyError(err);}}
+async function changeFlag(item,key){try{await write({...item,[key]:!item[key]},item,key==='starred'?'收藏已更新':'置顶已更新');}catch(err){notifyError(err);}}
 async function copyItem(item,mode='temporary'){
   const content=projectPrompt(item,mode);
   try{await copyText(content);toast(mode==='handoff'?'✓ 已复制正式接手词':'✓ 已复制到剪贴板');}
@@ -92,12 +137,12 @@ function openEdit(item=null){
 async function saveEdit(event){
   event.preventDefault();if(saving)return;
   const form=new FormData($('editForm'));const patch=Object.fromEntries(['kind','title','summary','body','entry_url','current_url'].map(k=>[k,String(form.get(k)||'')]));
-  try{const fields=normalizeItem(patch);await write({...(editing||{}),...fields,starred:Boolean(editing?.starred),pinned:Boolean(editing?.pinned)},editing);hide('editDialog');toast('✓ 保存成功');}
+  try{const fields=normalizeItem(patch);await write({...(editing||{}),...fields,starred:Boolean(editing?.starred),pinned:Boolean(editing?.pinned)},editing,'✓ 保存成功');hide('editDialog');}
   catch(err){notifyError(err);}
 }
 async function deleteEdit(){if(!editing)return;
   if(!confirm(`确定删除「${editing.title}」？删除后可通过已有 JSON 备份恢复。`))return;
-  try{await repo.remove(editing);items=items.filter(v=>v.id!==editing.id);render();hide('editDialog');toast('已删除');}
+  try{await commitOperations([{action:'delete',id:editing.id,base_revision:editing.revision}],'已删除');hide('editDialog');}
   catch(err){notifyError(err);}
 }
 async function copyForAI(item=editing){if(!item)return;
@@ -109,39 +154,49 @@ async function copyForAI(item=editing){if(!item)return;
 function previewItems(target,records,kind){
   target.replaceChildren();
   const labels={title:'标题',body:'正文',summary:'简介',kind:'类型',entry_url:'入口',current_url:'Current',starred:'收藏',pinned:'置顶'};
-  const snippet=value=>{
-    const text=String(value ?? '（空）');
-    return text.length>180?text.slice(0,180)+'…（预览只显示前 180 字）':text;
-  };
   for(const v of records){
     const block=el('div','preview-item');
     block.append(el('div','diff-title',kind==='ai'?`${v.action==='create'?'新增':'更新'} · ${v.after.title}`:`${v.existing?'合并':'新增'} · ${v.item.title}`));
-    if(!v.changed.length){block.append(el('div','before-after','没有内容变化'));target.append(block);continue;}
+    if(!v.changed.length){block.append(el('div','before-after','内容无变化'));target.append(block);continue;}
     const original=kind==='ai'?v.before:v.existing;
     const next=kind==='ai'?v.after:v.data;
     for(const key of v.changed){
       const line=el('div','diff-line');line.append(el('div','diff-name',labels[key]||key));
-      if(original)line.append(el('div','before-after','原：'+snippet(original[key])));
-      line.append(el('div','before-after after','新：'+snippet(next[key])));
+      const a=original ? '原：'+String(original[key]??'（空）') : '';
+      const b='新：'+String(next[key]??'（空）');
+      // Long content is fully inspectable without filling the dialog initially.
+      if(Math.max(a.length,b.length)>200){
+        const fold=el('details','diff-expand');fold.append(el('summary','','展开查看完整修改（'+Math.max(a.length,b.length)+' 字）'));
+        if(original)fold.append(el('div','before-after',a));fold.append(el('div','before-after after',b));line.append(fold);
+      } else {
+        if(original)line.append(el('div','before-after',a));line.append(el('div','before-after after',b));
+      }
       block.append(line);
     }
     target.append(block);
   }
 }
 function openAI(){aiPending=null;$('aiInput').value='';$('aiPreview').replaceChildren();$('applyAiBtn').disabled=true;show('aiDialog');}
-function previewAI(){aiPending=null;$('applyAiBtn').disabled=true;const box=$('aiPreview');box.replaceChildren();
-  try{const changes=parseAIPatch($('aiInput').value,items);aiPending=changes;previewItems(box,changes,'ai');$('applyAiBtn').disabled=!changes.some(v=>v.changed.length);if(!changes.some(v=>v.changed.length))box.prepend(el('div','preview-item','内容无变化，无须导入。'));}
-  catch(err){box.append(el('div','preview-item preview-error',err.message));}
+function previewAI(){
+  aiPending=null;$('applyAiBtn').disabled=true;const box=$('aiPreview');box.replaceChildren();
+  const raw=$('aiInput').value.trim();if(!raw)return;
+  try{
+    const changes=parseAIPatch(raw,items);aiPending=changes;previewItems(box,changes,'ai');
+    const updated=changes.filter(v=>v.changed.length).length;
+    box.prepend(el('div','preview-status',`已检查 ${changes.length} 条，实际修改 ${updated} 条 · 将整体提交`));
+    $('applyAiBtn').disabled=updated===0;
+  }catch(err){box.append(el('div','preview-item preview-error',err.message));}
 }
-async function applyAI(){if(!aiPending)return;let count=0;try{
+async function applyAI(){
+  if(!aiPending)return;
   $('applyAiBtn').disabled=true;
-  for(const change of aiPending){if(!change.changed.length)continue;
-    const current=change.before?items.find(v=>v.id===change.id):null;
-    if(change.before && current?.revision!==change.before.revision)throw Error('有记录在预览后发生变化，请重新检查差异');
-    await write({...change.after,starred:Boolean(current?.starred),pinned:Boolean(current?.pinned)},current);count++;
-  }
-  aiPending=null;hide('aiDialog');toast(`✓ 已应用 ${count} 条修改`);
-}catch(err){notifyError(err);$('aiPreview').prepend(el('div','preview-item preview-error',`已应用 ${count} 条；后续操作失败：${err.message}。请刷新后重新预览剩余修改。`));}
+  try{
+    const changes=aiPending.filter(v=>v.changed.length);
+    const ops=changes.map(c=>({action:c.action,id:c.id||generateId(),base_revision:c.before?.revision,
+      record:{...c.after,starred:Boolean(c.before?.starred),pinned:Boolean(c.before?.pinned)}}));
+    await commitOperations(ops,`✓ 已整体应用 ${ops.length} 条修改`);
+    aiPending=null;hide('aiDialog');
+  }catch(err){notifyError(err);$('aiPreview').prepend(el('div','preview-item preview-error',`未应用任何修改：${err.message}`));}
 }
 function downloadBackup(){const json=createBackup(items),blob=new Blob([json],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`project-hub-backup-${new Date().toISOString().slice(0,10)}.json`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast(`✓ 已导出 ${items.length} 条记录`);}
 async function readBackupFile(){const file=$('backupFile').files?.[0];if(!file)return;backupPending=null;$('backupPreview').replaceChildren();$('applyBackupBtn').hidden=true;
@@ -159,15 +214,16 @@ async function readBackupFile(){const file=$('backupFile').files?.[0];if(!file)r
   }catch(err){$('backupPreview').replaceChildren(el('div','preview-item preview-error',err.message));}
   finally{$('backupFile').value='';}
 }
-async function applyBackup(){if(!backupPending)return;let done=0;try{
+async function applyBackup(){
+  if(!backupPending)return;
   $('applyBackupBtn').disabled=true;
-  for(const change of backupPending){const current=change.existing?items.find(v=>v.id===change.existing.id):null;
-    if(change.existing && current?.revision!==change.existing.revision)throw Error('记录在预览后已改变，请重新导入备份');
-    await write({...change.data,id:change.item.id},current);done++;
-  }
-  backupPending=null;$('backupPreview').replaceChildren();$('applyBackupBtn').hidden=true;toast(`✓ 合并 ${done} 条记录`);
-}catch(err){notifyError(err);$('backupPreview').prepend(el('div','preview-item preview-error',`已合并 ${done} 条；其余未完成。请重新导入检查。`));}
-finally{$('applyBackupBtn').disabled=false;}
+  try{
+    const ops=backupPending.map(c=>({action:c.existing?'update':'create',id:c.existing?.id||c.item.id,
+      base_revision:c.existing?.revision,record:{...c.data}}));
+    await commitOperations(ops,`✓ 已整体合并 ${ops.length} 条备份`);
+    backupPending=null;$('backupPreview').replaceChildren();$('applyBackupBtn').hidden=true;
+  }catch(err){notifyError(err);$('backupPreview').prepend(el('div','preview-item preview-error',`未合并任何修改：${err.message}`));}
+  finally{$('applyBackupBtn').disabled=false;}
 }
 async function login(e){e.preventDefault();try{await repo.login($('email').value,$('password').value);$('password').value='';hide('authDialog');await reload();toast('✓ 云端同步已连接');}catch(err){notifyError(err);}}
 
@@ -183,14 +239,15 @@ $('saveAiGuidanceBtn').addEventListener('click',()=>{const v=$('aiGuidance').val
 $('resetAiGuidanceBtn').addEventListener('click',()=>{$('aiGuidance').value=AI_DEFAULT_GUIDANCE;localStorage.removeItem(aiGuidanceKey);toast('✓ 已恢复默认');});
 document.addEventListener('click',e=>{if(!e.target.closest('.card-menu'))closeMenus();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenus();});
-$('previewAiBtn').addEventListener('click',previewAI);$('applyAiBtn').addEventListener('click',applyAI);
-$('aiInput').addEventListener('input',()=>{$('applyAiBtn').disabled=true;aiPending=null;});
+$('applyAiBtn').addEventListener('click',applyAI);
+$('aiInput').addEventListener('input',()=>{clearTimeout(previewTimer);$('applyAiBtn').disabled=true;aiPending=null;previewTimer=setTimeout(previewAI,180);});
+$('undoSettingsBtn').addEventListener('click',()=>undoLast());
 $('exportBtn').addEventListener('click',downloadBackup);$('importBtn').addEventListener('click',()=>$('backupFile').click());$('backupFile').addEventListener('change',readBackupFile);$('applyBackupBtn').addEventListener('click',applyBackup);
 $('refreshBtn').addEventListener('click',async()=>{await reload();toast('列表已刷新');});
-$('logoutBtn').addEventListener('click',()=>{repo.logout();items=[];render();hide('settingsDialog');show('authDialog');});
+$('logoutBtn').addEventListener('click',()=>{repo.logout();items=[];undoStack.length=0;updateUndoButton();render();hide('settingsDialog');show('authDialog');});
 $('authForm').addEventListener('submit',login);
 for(const b of document.querySelectorAll('[data-close]'))b.addEventListener('click',()=>hide(b.dataset.close));
 for(const d of document.querySelectorAll('dialog:not(#authDialog)'))d.addEventListener('click',e=>{if(e.target===d)d.close();});
 window.addEventListener('keydown',e=>{if(e.key==='/'&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)&&!document.querySelector('dialog[open]')){e.preventDefault();$('search').focus();}});
-updateStatus();
+updateStatus();updateUndoButton();
 if(cloud && !repo.signedIn)show('authDialog');else reload();

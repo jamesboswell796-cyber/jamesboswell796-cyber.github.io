@@ -9,18 +9,44 @@ function generateId(){
 const SESSION_KEY='project-hub-session';
 const base = cfg => cfg.supabaseUrl.replace(/\/$/, '');
 const msg = (s) => s ? JSON.stringify(s).slice(0,250) : '网络错误';
+const checkOps = ops => {
+  if(!Array.isArray(ops)||ops.length<1||ops.length>2000)throw Error('每次提交需要 1–2000 条修改');
+  const seen=new Set();
+  for(const op of ops){
+    if(!['create','update','delete'].includes(op?.action))throw Error('不支持的修改类型');
+    if(!op.id||typeof op.id!=='string'||op.id.length>128||seen.has(op.id))throw Error('记录 ID 缺失、过长或重复');
+    seen.add(op.id);
+    if(op.action!=='create'&&(!Number.isSafeInteger(op.base_revision)||op.base_revision<1))throw Error('修改缺少原版本，请刷新后重试');
+    if(op.action!=='delete'&&(!op.record||typeof op.record!=='object'))throw Error('修改内容不完整');
+  }
+};
+const recordFields = o => Object.fromEntries(['kind','title','summary','body','entry_url','current_url','starred','pinned'].map(k=>[k,o[k]]));
 
 export class LocalRepository {
   async list(){ return JSON.parse(localStorage.getItem(KEY)||'[]'); }
-  async save(record, original=null) {
-    const values=await this.list();
-    const now=new Date().toISOString();
-    const row={...record,id: original?.id || record.id || generateId(),revision:(original?.revision||0)+1,updated_at:now};
-    if(original){const i=values.findIndex(x=>x.id===original.id);if(i<0||values[i].revision!==original.revision)throw Error('记录已被其他操作更新，请刷新');values[i]=row;}
-    else values.push(row);
-    localStorage.setItem(KEY,JSON.stringify(values));return row;
+  async applyBatch(ops){
+    checkOps(ops);
+    const stored=await this.list();const rows=stored.map(x=>({...x}));const now=new Date().toISOString();const result=[];
+    for(const op of ops){
+      const i=rows.findIndex(x=>x.id===op.id);let row=null;
+      if(op.action==='create'){
+        if(i>=0)throw Error('记录 ID 已存在，未写入任何修改');
+        row={...recordFields(op.record),id:op.id,revision:1,created_at:now,updated_at:now};rows.push(row);
+      }else{
+        if(i<0||rows[i].revision!==op.base_revision)throw Error('记录已由其他操作更新；本次全部取消，请刷新后重试');
+        if(op.action==='delete')rows.splice(i,1);
+        else{row={...rows[i],...recordFields(op.record),revision:rows[i].revision+1,updated_at:now};rows[i]=row;}
+      }
+      result.push({action:op.action,id:op.id,row});
+    }
+    localStorage.setItem(KEY,JSON.stringify(rows)); // exactly one durable write; failed validation writes nothing
+    return result;
   }
-  async remove(row) {const values=await this.list();localStorage.setItem(KEY, JSON.stringify(values.filter(v=>v.id!==row.id)));}
+  async save(record,original=null){
+    const id=original?.id||record.id||generateId();
+    const [r]=await this.applyBatch([{action:original?'update':'create',id,base_revision:original?.revision,record}]);return r.row;
+  }
+  async remove(row){await this.applyBatch([{action:'delete',id:row.id,base_revision:row.revision}]);}
 }
 
 export class SupabaseRepository {
@@ -46,25 +72,22 @@ export class SupabaseRepository {
     if(!this.signedIn)throw Error('请先登录以读取云端内容');
     if(Date.now() < (this.auth.expires_at||0)*1000-45000)return;
     const result=await this.request('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:{refresh_token:this.auth.refresh_token},token:null});
-    this.auth=result;localStorage.setItem(SESSION_KEY,JSON.stringify(result));
-    // Supabase token refresh returns expires_in, expires_at often included; persist local fallback.
-    if(!this.auth.expires_at)this.auth.expires_at=Math.floor(Date.now()/1000)+(result.expires_in||3600);
+    this.auth={...result,expires_at:result.expires_at||Math.floor(Date.now()/1000)+(result.expires_in||3600)};
     localStorage.setItem(SESSION_KEY,JSON.stringify(this.auth));
   }
   async list(){await this.ensureAuth();return this.request('/rest/v1/hub_items?select=*&order=updated_at.desc');}
-  async save(record, original=null){
-    await this.ensureAuth();
-    const data={kind:record.kind,title:record.title,summary:record.summary,body:record.body,entry_url:record.entry_url,current_url:record.current_url,starred:Boolean(record.starred),pinned:Boolean(record.pinned)};
-    if(original){
-      const rows=await this.request(`/rest/v1/hub_items?id=eq.${encodeURIComponent(original.id)}&revision=eq.${original.revision}&select=*`,{method:'PATCH',body:data,prefer:'return=representation'});
-      if(rows.length===0)throw Error('云端记录已变更，未覆盖其他设备修改。请点击同步后重试。');
-      return rows[0];
-    }
-    return (await this.request('/rest/v1/hub_items?select=*',{method:'POST',body:{...data,id:record.id||generateId()},prefer:'return=representation'}))[0];
+  async applyBatch(ops){
+    checkOps(ops);await this.ensureAuth();
+    // A single Postgres RPC transaction. Never emulate an atomic batch with sequential REST writes.
+    const result=await this.request('/rest/v1/rpc/hub_apply_batch',{method:'POST',body:{p_changes:ops}});
+    if(!Array.isArray(result)||result.length!==ops.length)throw Error('云端返回异常，请刷新检查修改结果');
+    return result;
   }
-  async remove(row){
-    await this.ensureAuth();
-    const result=await this.request(`/rest/v1/hub_items?id=eq.${encodeURIComponent(row.id)}&revision=eq.${row.revision}&select=*`,{method:'DELETE',prefer:'return=representation'});
-    if(result.length===0)throw Error('云端记录已变更，未删除其他设备修改。请同步后重试。');
+  // Compatibility for earlier callers and unit tests; user operations use applyBatch.
+  async save(record,original=null){
+    const id=original?.id||record.id||generateId();
+    const [r]=await this.applyBatch([{action:original?'update':'create',id,base_revision:original?.revision,record}]);return r.row;
   }
+  async remove(row){await this.applyBatch([{action:'delete',id:row.id,base_revision:row.revision}]);}
 }
+export { generateId };

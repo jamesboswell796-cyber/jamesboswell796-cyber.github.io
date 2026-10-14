@@ -24,3 +24,15 @@
 .card-tools .tool,.menu-trigger{min-height:38px;min-width:38px}
 .card-tools .handoff{min-width:44px}.card-tools .tool-ai{min-width:50px}
 @media(max-width:420px){.card-bottom{padding-top:4px;padding-bottom:4px}.card-tools{gap:0}}
+
+/* v0.3: invisible complexity - automatic review, full diff, unobtrusive undo */
+.preview-status{font-size:12px;color:var(--accent);font-weight:650;margin:4px 0 12px}
+.diff-expand{border:1px solid var(--line);background:var(--bg);border-radius:9px;margin-top:6px;padding:8px 10px}
+.diff-expand summary{cursor:pointer;font-size:12px;color:var(--accent);font-weight:650}
+.diff-expand[open] summary{margin-bottom:8px}
+.diff-expand .before-after{max-height:400px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+.toast{display:flex;align-items:center;gap:14px;white-space:normal;overflow:visible}
+.toast-undo{border:0;border-radius:9px;background:rgba(255,255,255,.17);color:inherit;padding:6px 9px;font-weight:750;white-space:nowrap}
+.toast-undo:focus-visible{outline:2px solid currentColor}
+@media(max-width:420px){.toast{width:max-content;max-width:calc(100vw - 28px)}}
+.toast.visible{pointer-events:auto}
