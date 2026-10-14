@@ -25,7 +25,7 @@ begin
   end if;
   for step in select value from jsonb_array_elements(p_changes) loop
     what := step->>'action'; key := step->>'id';payload := step->'record';
-    if what not in ('create','update','delete') or key is null or length(key) not between 1 and 128 or key = any(seen) then
+    if what is null or what not in ('create','update','delete') or key is null or length(key) not between 1 and 128 or key = any(seen) then
       raise exception 'Invalid action or duplicated ID';
     end if;
     seen := array_append(seen,key);

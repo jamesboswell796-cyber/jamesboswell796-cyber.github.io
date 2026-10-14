@@ -70,15 +70,23 @@ const preferred=localStorage.getItem(themeKey)||((matchMedia('(prefers-color-sch
 saveTheme(preferred);
 function updateStatus(){
   const status=$('storageStatus');status.replaceChildren();
-  const dot=el('span',`status-dot${cloud?' cloud':''}`);status.append(dot,document.createTextNode(cloud?' 已连接个人云端':' 本地演示 · 未跨设备同步'));
-  $('settingsMode').textContent=cloud?'个人云同步已启用。每次修改立即写入 Supabase，其他设备刷新或重新打开后可见。':'当前为本地演示：只保存在这台设备的浏览器。填写 config.js 并部署 Supabase 后可启用个人云同步。';
+  const dot=el('span',`status-dot${cloud?' cloud':''}`);status.append(dot,document.createTextNode(cloud?(repo.signedIn?' 个人云端 · 已登录':' 云同步已配置 · 待登录'):' 本地演示 · 未跨设备同步'));
+  $('settingsMode').textContent=cloud?(repo.signedIn?'已登录个人云端。每次修改会请求保存到 Supabase，其他设备刷新或重新打开后可见。':'云同步已配置，但还没有登录。请登录后再查看或修改私有提示词。'):'当前为本地演示：只保存在这台设备的浏览器。填写 config.js 并部署 Supabase 后可启用个人云同步。';
   $('refreshBtn').textContent=cloud?'↻ 从云端刷新':'↻ 刷新列表';
   $('logoutBtn').hidden=!cloud;
   $('syncNotice').textContent=cloud?'':'当前为本地演示模式：数据仅存于本浏览器，尚未启用云同步。';
 }
 async function reload(){
-  try{items=await repo.list();render();updateStatus();}
-  catch(err){items=[];render();notifyError(err);if(cloud){repo.logout();show('authDialog');}}
+  try{
+    const latest=await repo.list();
+    items=latest;render();updateStatus();return true;
+  }catch(err){
+    // A transient cloud failure is NOT a sign that the user's data disappeared.
+    // Keep the last successful view; never fall back to an unsynced local copy.
+    notifyError(err);
+    if(cloud && (err?.status===401 || err?.status===403 || !repo.signedIn))show('authDialog');
+    updateStatus();return false;
+  }
 }
 function closeMenus(){ document.querySelectorAll('.card-menu[open]').forEach(menu=>menu.open=false); }
 function card(item){
@@ -225,7 +233,11 @@ async function applyBackup(){
   }catch(err){notifyError(err);$('backupPreview').prepend(el('div','preview-item preview-error',`未合并任何修改：${err.message}`));}
   finally{$('applyBackupBtn').disabled=false;}
 }
-async function login(e){e.preventDefault();try{await repo.login($('email').value,$('password').value);$('password').value='';hide('authDialog');await reload();toast('✓ 云端同步已连接');}catch(err){notifyError(err);}}
+async function login(e){e.preventDefault();try{
+  await repo.login($('email').value,$('password').value);$('password').value='';
+  const loaded=await reload();
+  if(loaded){hide('authDialog');toast('✓ 云端同步已连接');}
+}catch(err){notifyError(err);}}
 
 $('search').addEventListener('input',render);
 $('newBtn').addEventListener('click',()=>openEdit());$('emptyNew').addEventListener('click',()=>openEdit());
@@ -243,7 +255,7 @@ $('applyAiBtn').addEventListener('click',applyAI);
 $('aiInput').addEventListener('input',()=>{clearTimeout(previewTimer);$('applyAiBtn').disabled=true;aiPending=null;previewTimer=setTimeout(previewAI,180);});
 $('undoSettingsBtn').addEventListener('click',()=>undoLast());
 $('exportBtn').addEventListener('click',downloadBackup);$('importBtn').addEventListener('click',()=>$('backupFile').click());$('backupFile').addEventListener('change',readBackupFile);$('applyBackupBtn').addEventListener('click',applyBackup);
-$('refreshBtn').addEventListener('click',async()=>{await reload();toast('列表已刷新');});
+$('refreshBtn').addEventListener('click',async()=>{if(await reload())toast('列表已刷新');});
 $('logoutBtn').addEventListener('click',()=>{repo.logout();items=[];undoStack.length=0;updateUndoButton();render();hide('settingsDialog');show('authDialog');});
 $('authForm').addEventListener('submit',login);
 for(const b of document.querySelectorAll('[data-close]'))b.addEventListener('click',()=>hide(b.dataset.close));

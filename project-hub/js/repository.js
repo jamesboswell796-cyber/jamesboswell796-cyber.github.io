@@ -60,12 +60,16 @@ export class SupabaseRepository {
     try{response=await fetch(`${base(this.config)}${path}`,{method,headers,body:body==null?undefined:JSON.stringify(body),cache:'no-store'});}
     catch{throw Error('无法访问云端。为避免数据分叉，本次没有改为本地保存。');}
     const result=response.status===204 ? null : await response.json().catch(()=>null);
-    if(!response.ok)throw Error(result?.msg || result?.error_description || result?.message || `云端操作失败 (${response.status})：${msg(result)}`);
+    if(!response.ok){
+      const err=new Error(result?.msg || result?.error_description || result?.message || `云端操作失败 (${response.status})：${msg(result)}`);
+      err.status=response.status;throw err;
+    }
     return result;
   }
   async login(email,password){
     const result=await this.request('/auth/v1/token?grant_type=password',{method:'POST',body:{email,password},token:null});
-    this.auth=result;localStorage.setItem(SESSION_KEY,JSON.stringify(result));return result;
+    this.auth={...result,expires_at:result.expires_at||Math.floor(Date.now()/1000)+(result.expires_in||3600)};
+    localStorage.setItem(SESSION_KEY,JSON.stringify(this.auth));return this.auth;
   }
   logout(){this.auth=null;localStorage.removeItem(SESSION_KEY);}
   async ensureAuth(){
@@ -75,7 +79,19 @@ export class SupabaseRepository {
     this.auth={...result,expires_at:result.expires_at||Math.floor(Date.now()/1000)+(result.expires_in||3600)};
     localStorage.setItem(SESSION_KEY,JSON.stringify(this.auth));
   }
-  async list(){await this.ensureAuth();return this.request('/rest/v1/hub_items?select=*&order=updated_at.desc');}
+  async list(){
+    await this.ensureAuth();
+    // PostgREST projects often cap one response at 1,000 rows. Read all pages,
+    // rather than silently hiding older records in a larger personal library.
+    const pageSize=500, records=[];
+    for(let offset=0;offset<20000;offset+=pageSize){
+      const page=await this.request(`/rest/v1/hub_items?select=*&order=updated_at.desc,id.asc&limit=${pageSize}&offset=${offset}`);
+      if(!Array.isArray(page))throw Error('云端列表响应格式错误，未替换当前内容');
+      records.push(...page);
+      if(page.length<pageSize)return records;
+    }
+    throw Error('云端列表超过 20000 条；为避免遗漏，请先分批整理后重试');
+  }
   async applyBatch(ops){
     checkOps(ops);await this.ensureAuth();
     // A single Postgres RPC transaction. Never emulate an atomic batch with sequential REST writes.
