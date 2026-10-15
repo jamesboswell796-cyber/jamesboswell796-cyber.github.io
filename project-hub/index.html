@@ -25,12 +25,12 @@
         <label class="searchbox"><span class="search-icon" aria-hidden="true">⌕</span><input id="search" type="search" placeholder="搜索项目或提示词…" autocomplete="off" spellcheck="false"><span class="keycap desktop-only">/</span></label>
         <button id="newBtn" type="button" class="primary-button"><span aria-hidden="true">＋</span> 新建</button>
       </section>
-      <div class="filterbar"><div class="filter-tabs"><button id="allFilter" class="filter active" type="button">全部 <span id="allCount"></span></button><button id="starFilter" class="filter" type="button">☆ 收藏 <span id="starCount"></span></button></div><button id="aiBtn" type="button" class="text-action">✧ AI 导入 <span aria-hidden="true">↗</span></button></div>
-      <div id="syncNotice" class="sync-notice" role="status"></div>
+      <div class="filterbar"><div class="filter-tabs"><button id="allFilter" class="filter active" type="button">全部 <span id="allCount"></span></button><button id="starFilter" class="filter" type="button">☆ 收藏 <span id="starCount"></span></button><button id="draftFilter" class="filter" type="button">草稿 <span id="draftCount"></span></button></div><button id="aiBtn" type="button" class="text-action">✧ AI 导入 <span aria-hidden="true">↗</span></button></div>
+      <div id="syncNotice" class="sync-notice" role="status"></div><div id="draftQuick" class="draft-quick" hidden><button type="button" id="newDraftBtn" class="draft-quick-button"><span>✎ 随便写点什么…</span><small>自动保存 · 完善后收入词库</small></button></div>
       <section id="cards" class="cards" aria-live="polite" aria-label="提示词列表"></section>
       <div id="empty" class="empty" hidden><div class="empty-art" aria-hidden="true">✳</div><h2 id="emptyTitle">还没有提示词</h2><p id="emptySub">点击「新建」，添加你的第一条提示词。</p><button id="emptyNew" type="button" class="outline-button">＋ 创建一条</button></div>
     </main>
-    <footer class="footer"><span id="storageStatus"><span class="status-dot"></span> 本地演示</span><span>清晰 · 轻巧 · v0.3.1</span></footer>
+    <footer class="footer"><span id="storageStatus"><span class="status-dot"></span> 本地演示</span><span>清晰 · 轻巧 · v0.4</span></footer>
   </div>
 
   <dialog id="editDialog" class="sheet-dialog" aria-labelledby="editHeading">
@@ -43,6 +43,15 @@
       <div class="editor-utility"><button type="button" id="copyForAIBtn" class="subtle-button" hidden>✧ 复制给 AI 修改</button><button type="button" id="deleteBtn" class="danger-text" hidden>删除这条</button></div>
       <div class="dialog-actions"><button type="button" class="outline-button" data-close="editDialog">取消</button><button type="submit" id="saveBtn" class="primary-button">保存</button></div>
     </form>
+  </dialog>
+
+  <dialog id="draftDialog" class="sheet-dialog" aria-labelledby="draftHeading">
+    <div class="dialog-head"><div><p class="eyebrow">DRAFT WORKSPACE</p><h2 id="draftHeading">随便写写</h2></div><button type="button" class="close-btn" id="closeDraftBtn" aria-label="关闭草稿">×</button></div>
+    <p class="dialog-lead">先写想法，不必整理。离开会自动保存；收入词库时再确认标题。</p>
+    <label class="field"><span>标题 <small>暂时可不填</small></span><input id="draftTitle" maxlength="160" placeholder="未命名草稿"></label>
+    <label class="field"><span>内容</span><textarea id="draftBody" class="draft-body" rows="12" placeholder="一句想法、几个关键词，或者一段待完善的提示词……"></textarea></label>
+    <p id="draftStatus" class="draft-save-status" role="status">自动保存</p>
+    <div class="draft-actions"><button type="button" class="outline-button" id="draftDeleteBtn">删除</button><div class="draft-actions-right"><button type="button" class="outline-button" id="draftAiBtn">✧ 交给 AI</button><button type="button" class="primary-button" id="promoteDraftBtn">收入词库 ↗</button></div></div>
   </dialog>
 
   <dialog id="aiDialog" class="sheet-dialog" aria-labelledby="aiHeading"><div class="dialog-head"><div><p class="eyebrow">AI CONNECTION</p><h2 id="aiHeading">从 ChatGPT 导入</h2></div><button type="button" class="close-btn" data-close="aiDialog" aria-label="关闭">×</button></div><p class="dialog-lead">粘贴 ChatGPT 返回的结构化 JSON。粘贴后自动检查并预览；确认后整体写入，不改变收藏和置顶。</p><label class="field"><span>AI 修改包</span><textarea id="aiInput" rows="9" spellcheck="false" placeholder='{"schema":"project-hub.patch.v2","changes":[{"action":"create","title":"示例","body":"正文"}]}'></textarea></label><div id="aiPreview" class="preview" aria-live="polite"></div><div class="dialog-actions"><button type="button" id="applyAiBtn" class="primary-button" disabled>确认应用</button></div></dialog>

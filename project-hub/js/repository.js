@@ -20,7 +20,7 @@ const checkOps = ops => {
     if(op.action!=='delete'&&(!op.record||typeof op.record!=='object'))throw Error('修改内容不完整');
   }
 };
-const recordFields = o => Object.fromEntries(['kind','title','summary','body','entry_url','current_url','starred','pinned'].map(k=>[k,o[k]]));
+const recordFields = o => Object.fromEntries(['kind','title','summary','body','entry_url','current_url','starred','pinned','status'].map(k=>[k,o[k]]));
 
 export class LocalRepository {
   async list(){ return JSON.parse(localStorage.getItem(KEY)||'[]'); }

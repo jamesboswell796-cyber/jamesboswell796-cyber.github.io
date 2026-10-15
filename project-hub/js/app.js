@@ -8,6 +8,7 @@ const config=window.PROJECT_HUB_CONFIG||{};
 const cloud=Boolean(config.supabaseUrl && config.supabaseAnonKey);
 const repo=cloud ? new SupabaseRepository(config) : new LocalRepository();
 let items=[], editing=null, activeFilter='all', aiPending=null, backupPending=null, saving=false, toastTimer=null, previewTimer=null;
+let activeDraftId=null, draftTimer=null, draftFlushPromise=null;
 const undoStack=[];
 const themeKey='project-hub-theme';
 const aiGuidanceKey='project-hub-ai-guidance-v1';
@@ -91,13 +92,15 @@ async function reload(){
 function closeMenus(){ document.querySelectorAll('.card-menu[open]').forEach(menu=>menu.open=false); }
 function card(item){
   const article=el('article','prompt-card'); article.dataset.id=item.id;
-  const main=btn('card-main',`复制${item.kind==='project'?'临时调用词':'提示词'}：${item.title}`,'',()=>copyItem(item));
+  const isDraft=item.status==='draft';
+  if(isDraft)article.classList.add('draft-card');
+  const main=btn('card-main',isDraft?'继续写草稿':`复制${item.kind==='project'?'临时调用词':'提示词'}：${item.title}`,'',()=>isDraft?openDraft(item):copyItem(item));
   if(item.pinned) main.append(el('span','pinned-label','📌 置顶'));
-  main.append(el('div','card-title',item.title),el('div','card-summary',item.summary|| (item.kind==='project'?'点击复制项目临时调用词':'点击复制提示词')));
+  main.append(el('div','card-title',item.title),el('div','card-summary',isDraft?(item.body.slice(0,90)||'还没有内容，点击继续写'):item.summary|| (item.kind==='project'?'点击复制项目临时调用词':'点击复制提示词')));
   const bottom=el('div','card-bottom');
-  bottom.append(el('span','card-hint',item.kind==='project'?'◇ 项目入口':'轻点卡片复制'));
+  bottom.append(el('span','card-hint',isDraft?'✎ 草稿 · 点击继续写':item.kind==='project'?'◇ 项目入口':'轻点卡片复制'));
   const tools=el('div','card-tools');
-  tools.append(btn(`tool${item.starred?' star-active':''}`,item.starred?'取消收藏':'加入收藏',item.starred?'★':'☆',()=>changeFlag(item,'starred')));
+  if(!isDraft)tools.append(btn(`tool${item.starred?' star-active':''}`,item.starred?'取消收藏':'加入收藏',item.starred?'★':'☆',()=>changeFlag(item,'starred')));
   tools.append(btn('tool tool-ai','复制给 AI 修改','✧ AI',()=>copyForAI(item)));
   if(item.kind==='project')tools.append(btn('tool handoff','复制正式接手 Worker 提示词','接手',()=>copyItem(item,'handoff')));
   const menu=el('details','card-menu');
@@ -105,7 +108,7 @@ function card(item){
   summary.addEventListener('click',e=>{e.stopPropagation();const wasOpen=menu.open;closeMenus(); if(wasOpen)menu.open=true;});
   const options=el('div','menu-popover');
   const opt=(name,label,run)=>options.append(btn('menu-option',name,label,()=>{menu.open=false;run();}));
-  opt('编辑','✎ 编辑',()=>openEdit(item));
+  opt('编辑','✎ 编辑',()=>isDraft?openDraft(item):openEdit(item));
   opt('置顶',item.pinned?'取消置顶':'📌 置顶',()=>changeFlag(item,'pinned'));
   if(item.kind==='project')opt('打开项目入口','↗ 打开入口',()=>window.open(item.entry_url,'_blank','noopener,noreferrer'));
   menu.append(summary,options);tools.append(menu);
@@ -113,13 +116,16 @@ function card(item){
 }
 
 function render(){
-  const q=$('search').value;const list=sortedItems(items,q,activeFilter==='star');
-  $('allCount').textContent=items.length;$('starCount').textContent=items.filter(x=>x.starred).length;
-  $('allFilter').classList.toggle('active',activeFilter==='all');$('starFilter').classList.toggle('active',activeFilter==='star');
+  const q=$('search').value;const published=items.filter(x=>x.status!=='draft'),drafts=items.filter(x=>x.status==='draft');
+  const visible=activeFilter==='draft'?drafts:published;
+  const list=sortedItems(visible,q,activeFilter==='star');
+  $('allCount').textContent=published.length;$('starCount').textContent=published.filter(x=>x.starred).length;$('draftCount').textContent=drafts.length;
+  for(const name of ['all','star','draft'])$(name+'Filter').classList.toggle('active',activeFilter===name);
+  $('draftQuick').hidden=activeFilter!=='draft';
   $('cards').replaceChildren(...list.map(card));$('empty').hidden=list.length>0;
-  $('emptyTitle').textContent=items.length===0?'还没有提示词':activeFilter==='star'?'暂无收藏':'没有找到匹配项';
-  $('emptySub').textContent=items.length===0?'点击「新建」，添加你的第一条提示词。':activeFilter==='star'?'为常用卡片点亮星标，它们会出现在这里。':'换个关键词试试，或者创建新提示词。';
-  $('emptyNew').hidden=items.length>0;
+  $('emptyTitle').textContent=activeFilter==='draft'?'还没有草稿':activeFilter==='star'?'暂无收藏':'没有找到匹配项';
+  $('emptySub').textContent=activeFilter==='draft'?'点击上方输入区，想写什么就写什么。':activeFilter==='star'?'为常用卡片点亮星标，它们会出现在这里。':'换个关键词试试，或者新建提示词。';
+  $('emptyNew').hidden=activeFilter==='draft'||items.length>0;
 }
 async function write(record, original=null, label='✓ 已保存'){
   const id=original?.id||record.id||generateId();
@@ -145,7 +151,7 @@ function openEdit(item=null){
 async function saveEdit(event){
   event.preventDefault();if(saving)return;
   const form=new FormData($('editForm'));const patch=Object.fromEntries(['kind','title','summary','body','entry_url','current_url'].map(k=>[k,String(form.get(k)||'')]));
-  try{const fields=normalizeItem(patch);await write({...(editing||{}),...fields,starred:Boolean(editing?.starred),pinned:Boolean(editing?.pinned)},editing,'✓ 保存成功');hide('editDialog');}
+  try{const fields=normalizeItem(patch);await write({...(editing||{}),...fields,starred:Boolean(editing?.starred),pinned:Boolean(editing?.pinned),status:'published'},editing,'✓ 保存成功');hide('editDialog');}
   catch(err){notifyError(err);}
 }
 async function deleteEdit(){if(!editing)return;
@@ -161,7 +167,7 @@ async function copyForAI(item=editing){if(!item)return;
 
 function previewItems(target,records,kind){
   target.replaceChildren();
-  const labels={title:'标题',body:'正文',summary:'简介',kind:'类型',entry_url:'入口',current_url:'Current',starred:'收藏',pinned:'置顶'};
+  const labels={title:'标题',body:'正文',summary:'简介',kind:'类型',entry_url:'入口',current_url:'Current',starred:'收藏',pinned:'置顶',status:'状态'};
   for(const v of records){
     const block=el('div','preview-item');
     block.append(el('div','diff-title',kind==='ai'?`${v.action==='create'?'新增':'更新'} · ${v.after.title}`:`${v.existing?'合并':'新增'} · ${v.item.title}`));
@@ -201,7 +207,7 @@ async function applyAI(){
   try{
     const changes=aiPending.filter(v=>v.changed.length);
     const ops=changes.map(c=>({action:c.action,id:c.id||generateId(),base_revision:c.before?.revision,
-      record:{...c.after,starred:Boolean(c.before?.starred),pinned:Boolean(c.before?.pinned)}}));
+      record:{...c.after,starred:Boolean(c.before?.starred),pinned:Boolean(c.before?.pinned),status:c.before?.status||'published'}}));
     await commitOperations(ops,`✓ 已整体应用 ${ops.length} 条修改`);
     aiPending=null;hide('aiDialog');
   }catch(err){notifyError(err);$('aiPreview').prepend(el('div','preview-item preview-error',`未应用任何修改：${err.message}`));}
@@ -213,7 +219,7 @@ async function readBackupFile(){const file=$('backupFile').files?.[0];if(!file)r
       const existing=byId.get(item.id)||null;
       // The backup owns content but leaves existing personal star/pin choices intact.
       const data={...normalizeItem(item),starred:existing?.starred ?? item.starred,pinned:existing?.pinned ?? item.pinned};
-      const keys=['title','body','kind','summary','entry_url','current_url','starred','pinned'];
+      const keys=['title','body','kind','summary','entry_url','current_url','starred','pinned','status'];
       return {item,existing,data,changed:keys.filter(k=>existing?.[k]!==data[k])};
     }).filter(v=>v.changed.length);
     backupPending=changed;previewItems($('backupPreview'),changed,'backup');
@@ -238,6 +244,85 @@ async function login(e){e.preventDefault();try{
   const loaded=await reload();
   if(loaded){hide('authDialog');toast('✓ 云端同步已连接');}
 }catch(err){notifyError(err);}}
+
+// A draft is an ordinary record with status=draft. Drafts never appear in the published list.
+// The editor queues writes and flushes before closing, so autosave cannot overwrite a later edit.
+async function newDraft(){
+  if(saving)return;
+  try{
+    const fields=normalizeItem({status:'draft',kind:'prompt',title:'未命名草稿',body:''});
+    const row=await write({...fields,starred:false,pinned:false},null,'已创建草稿');
+    activeFilter='draft';render();openDraft(row);
+  }catch(err){notifyError(err);}
+}
+function draftValue(){
+  return {title:$('draftTitle').value.trim()||'未命名草稿',body:$('draftBody').value,status:'draft',kind:'prompt'};
+}
+function openDraft(row){
+  clearTimeout(draftTimer);activeDraftId=row.id;
+  $('draftTitle').value=row.title==='未命名草稿'?'':row.title;
+  $('draftBody').value=row.body;
+  $('draftStatus').textContent='自动保存';show('draftDialog');$('draftBody').focus();
+}
+function draftDirty(row,data){return row.title!==data.title||row.body!==data.body;}
+async function flushDraft(){
+  clearTimeout(draftTimer);
+  if(draftFlushPromise)return draftFlushPromise;
+  if(!activeDraftId)return;
+  const run=async()=>{
+    for(let tries=0;tries<25;tries++){
+      const row=items.find(x=>x.id===activeDraftId);
+      if(!row||row.status!=='draft')return;
+      const data=draftValue();
+      if(!draftDirty(row,data)){$('draftStatus').textContent='✓ 已保存';return;}
+      if(saving){await new Promise(r=>setTimeout(r,140));continue;}
+      try{
+        $('draftStatus').textContent='正在保存…';
+        await write({...row,...data},row,null);
+      }catch(err){$('draftStatus').textContent='保存失败，请检查网络后重试';throw err;}
+    }
+    throw Error('保存繁忙，请重试');
+  };
+  draftFlushPromise=run().finally(()=>{draftFlushPromise=null;});return draftFlushPromise;
+}
+function scheduleDraft(){clearTimeout(draftTimer);$('draftStatus').textContent='等待自动保存…';draftTimer=setTimeout(()=>flushDraft().catch(notifyError),750);}
+async function closeDraft(){
+  if(!activeDraftId)return;
+  try{await flushDraft();$('draftDialog').close();activeDraftId=null;}
+  catch(err){notifyError(err);}
+}
+async function promoteDraft(){
+  if(!activeDraftId)return;
+  try{
+    await flushDraft();const row=items.find(x=>x.id===activeDraftId);
+    if(!row)return;
+    if(!$('draftTitle').value.trim()){$('draftStatus').textContent='请先给正式提示词起个标题';$('draftTitle').focus();return;}
+    if(!row.body.trim()){$('draftStatus').textContent='正文不能为空';$('draftBody').focus();return;}
+    const fields=normalizeItem({...row,status:'published',title:$('draftTitle').value.trim()});
+    await write({...row,...fields},row,'✓ 已收入正式词库');
+    $('draftDialog').close();activeDraftId=null;activeFilter='all';render();
+  }catch(err){notifyError(err);}
+}
+async function deleteDraft(){
+  const row=items.find(x=>x.id===activeDraftId);if(!row)return;
+  if(!confirm('确定删除这条草稿吗？'))return;
+  try{await commitOperations([{action:'delete',id:row.id,base_revision:row.revision}],'已删除草稿');$('draftDialog').close();activeDraftId=null;}
+  catch(err){notifyError(err);}
+}
+async function draftAI(){
+  try{await flushDraft();const row=items.find(x=>x.id===activeDraftId);if(row)await copyForAI(row);}
+  catch(err){notifyError(err);}
+}
+$('draftFilter').addEventListener('click',()=>{activeFilter='draft';render();});
+$('newDraftBtn').addEventListener('click',newDraft);
+$('draftTitle').addEventListener('input',scheduleDraft);
+$('draftBody').addEventListener('input',scheduleDraft);
+$('closeDraftBtn').addEventListener('click',closeDraft);
+$('draftAiBtn').addEventListener('click',draftAI);
+$('draftDeleteBtn').addEventListener('click',deleteDraft);
+$('promoteDraftBtn').addEventListener('click',promoteDraft);
+$('draftDialog').addEventListener('cancel',event=>{event.preventDefault();closeDraft();});
+$('draftDialog').addEventListener('click',event=>{if(event.target===$('draftDialog'))closeDraft();});
 
 $('search').addEventListener('input',render);
 $('newBtn').addEventListener('click',()=>openEdit());$('emptyNew').addEventListener('click',()=>openEdit());

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f6f5f2">
+  <meta name="description" content="你的个人 AI 项目与提示词快捷工作台。">
+  <title>Project Hub · Notion 实验版</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="config.js"></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <div class="app-frame">
+    <header class="topbar">
+      <div class="brand"><div class="brand-icon">✳</div><div class="brand-text"><strong>Project Hub</strong><span>Notion 实验版 · 独立数据</span></div></div>
+      <div class="top-actions">
+        <button type="button" id="themeBtn" class="icon-button desktop-only" title="切换深浅模式" aria-label="切换深浅模式">◐</button>
+        <button type="button" id="settingsBtn" class="icon-button" title="设置与备份" aria-label="设置与备份">⚙</button>
+      </div>
+    </header>
+    <main class="content">
+      <section class="toolbar" aria-label="快捷操作">
+        <label class="searchbox"><span class="search-icon" aria-hidden="true">⌕</span><input id="search" type="search" placeholder="搜索项目或提示词…" autocomplete="off" spellcheck="false"><span class="keycap desktop-only">/</span></label>
+        <button id="newBtn" type="button" class="primary-button"><span aria-hidden="true">＋</span> 新建</button>
+      </section>
+      <div class="filterbar"><div class="filter-tabs"><button id="allFilter" class="filter active" type="button">全部 <span id="allCount"></span></button><button id="starFilter" class="filter" type="button">☆ 收藏 <span id="starCount"></span></button><button id="draftFilter" class="filter" type="button">草稿 <span id="draftCount"></span></button></div><button id="aiBtn" type="button" class="text-action">✧ AI 导入 <span aria-hidden="true">↗</span></button></div>
+      <div id="syncNotice" class="sync-notice" role="status"></div><div id="draftQuick" class="draft-quick" hidden><button type="button" id="newDraftBtn" class="draft-quick-button"><span>✎ 随便写点什么…</span><small>自动保存 · 完善后收入词库</small></button></div>
+      <section id="cards" class="cards" aria-live="polite" aria-label="提示词列表"></section>
+      <div id="empty" class="empty" hidden><div class="empty-art" aria-hidden="true">✳</div><h2 id="emptyTitle">还没有提示词</h2><p id="emptySub">点击「新建」，添加你的第一条提示词。</p><button id="emptyNew" type="button" class="outline-button">＋ 创建一条</button></div>
+    </main>
+    <footer class="footer"><span id="storageStatus"><span class="status-dot"></span> 本地演示</span><span>Notion 实验版 · v0.4</span></footer>
+  </div>
+
+  <dialog id="editDialog" class="sheet-dialog" aria-labelledby="editHeading">
+    <form id="editForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">EDITOR</p><h2 id="editHeading">新建提示词</h2></div><button type="button" class="close-btn" data-close="editDialog" aria-label="关闭">×</button></div>
+      <div class="form-row kind-switch" role="group" aria-label="记录类型"><label><input name="kind" type="radio" value="prompt" checked>普通提示词</label><label><input name="kind" type="radio" value="project">项目入口</label></div>
+      <label class="field"><span>标题 <small>必填</small></span><input id="editTitle" name="title" maxlength="160" required placeholder="例如：课堂反馈生成"></label>
+      <label class="field"><span>一句简介 <small>可选</small></span><input id="editSummary" name="summary" maxlength="400" placeholder="简短说明它能帮你做什么"></label>
+      <div id="projectFields" hidden><label class="field"><span>项目入口 <small>必填 · 已核验的地址</small></span><input id="editEntry" name="entry_url" type="url" placeholder="https://drive.google.com/…"></label><label class="field"><span>Current 地址 <small>可选</small></span><input id="editCurrent" name="current_url" type="url" placeholder="https://drive.google.com/…"></label></div>
+      <label class="field"><span id="bodyLabel">提示词正文</span><textarea id="editBody" name="body" rows="7" placeholder="输入你想快速复制的内容…"></textarea><small id="bodyHelp" class="helper">点击卡片正文区域即可复制此内容。</small></label>
+      <div class="editor-utility"><button type="button" id="copyForAIBtn" class="subtle-button" hidden>✧ 复制给 AI 修改</button><button type="button" id="deleteBtn" class="danger-text" hidden>删除这条</button></div>
+      <div class="dialog-actions"><button type="button" class="outline-button" data-close="editDialog">取消</button><button type="submit" id="saveBtn" class="primary-button">保存</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="draftDialog" class="sheet-dialog" aria-labelledby="draftHeading">
+    <div class="dialog-head"><div><p class="eyebrow">DRAFT WORKSPACE</p><h2 id="draftHeading">随便写写</h2></div><button type="button" class="close-btn" id="closeDraftBtn" aria-label="关闭草稿">×</button></div>
+    <p class="dialog-lead">先写想法，不必整理。离开会自动保存；收入词库时再确认标题。</p>
+    <label class="field"><span>标题 <small>暂时可不填</small></span><input id="draftTitle" maxlength="160" placeholder="未命名草稿"></label>
+    <label class="field"><span>内容</span><textarea id="draftBody" class="draft-body" rows="12" placeholder="一句想法、几个关键词，或者一段待完善的提示词……"></textarea></label>
+    <p id="draftStatus" class="draft-save-status" role="status">自动保存</p>
+    <div class="draft-actions"><button type="button" class="outline-button" id="draftDeleteBtn">删除</button><div class="draft-actions-right"><button type="button" class="outline-button" id="draftAiBtn">✧ 交给 AI</button><button type="button" class="primary-button" id="promoteDraftBtn">收入词库 ↗</button></div></div>
+  </dialog>
+
+  <dialog id="aiDialog" class="sheet-dialog" aria-labelledby="aiHeading"><div class="dialog-head"><div><p class="eyebrow">AI CONNECTION</p><h2 id="aiHeading">从 ChatGPT 导入</h2></div><button type="button" class="close-btn" data-close="aiDialog" aria-label="关闭">×</button></div><p class="dialog-lead">粘贴 ChatGPT 返回的结构化 JSON。粘贴后自动检查并预览；确认后提交，不改变收藏和置顶。Notion 的多条写入不是原子事务。</p><label class="field"><span>AI 修改包</span><textarea id="aiInput" rows="9" spellcheck="false" placeholder='{"schema":"project-hub.patch.v2","changes":[{"action":"create","title":"示例","body":"正文"}]}'></textarea></label><div id="aiPreview" class="preview" aria-live="polite"></div><div class="dialog-actions"><button type="button" id="applyAiBtn" class="primary-button" disabled>确认应用</button></div></dialog>
+
+  <dialog id="settingsDialog" class="sheet-dialog small-dialog" aria-labelledby="settingsHeading"><div class="dialog-head"><div><p class="eyebrow">PREFERENCES</p><h2 id="settingsHeading">偏好设置</h2></div><button type="button" class="close-btn" data-close="settingsDialog" aria-label="关闭">×</button></div><section class="setting-group"><h3>数据与备份</h3><p id="settingsMode">当前为本地演示模式。配置 Supabase 后切换到个人云同步。</p><div class="button-row"><button type="button" id="undoSettingsBtn" class="outline-button" disabled>↶ 撤销上次操作</button><button type="button" id="exportBtn" class="outline-button">↓ 导出 JSON 备份</button><button type="button" id="importBtn" class="outline-button">↑ 导入 JSON 备份</button><input type="file" id="backupFile" accept=".json,application/json" hidden></div><div id="backupPreview" class="preview"></div><button type="button" id="applyBackupBtn" class="primary-button" hidden>确认合并备份</button></section><section class="setting-group"><h3>AI 修改偏好</h3><p>「交给 AI」时自动附带此偏好。输出格式与版本保护由网站固定管理，避免误改。此偏好目前只保存在当前浏览器。</p><label class="field"><span>你的 AI 编辑指导词</span><textarea id="aiGuidance" rows="5" maxlength="1500" placeholder="输入 AI 应如何优化你的提示词"></textarea></label><div class="button-row"><button type="button" id="saveAiGuidanceBtn" class="outline-button">保存偏好</button><button type="button" id="resetAiGuidanceBtn" class="outline-button">恢复默认</button></div></section><section class="setting-group"><h3>外观与同步</h3><div class="button-row"><button type="button" id="settingsThemeBtn" class="outline-button">◐ 切换深浅模式</button><button type="button" id="refreshBtn" class="outline-button">↻ 从云端刷新</button><button type="button" id="logoutBtn" class="outline-button" hidden>退出登录</button></div></section></dialog>
+
+  <dialog id="authDialog" class="sheet-dialog small-dialog" aria-labelledby="authHeading"><form id="authForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">PRIVATE CLOUD</p><h2 id="authHeading">登录你的工作台</h2></div></div><p class="dialog-lead">Notion 正式版由 Cloudflare Access 完成认证，此表单仅作兼容保留。</p><label class="field"><span>邮箱</span><input id="email" type="email" required autocomplete="username"></label><label class="field"><span>密码</span><input id="password" type="password" required autocomplete="current-password"></label><div class="dialog-actions"><button type="submit" class="primary-button fill">登录并同步</button></div></form></dialog>
+
+  <dialog id="manualCopyDialog" class="sheet-dialog small-dialog" aria-labelledby="manualHeading"><div class="dialog-head"><h2 id="manualHeading">请手动复制</h2><button type="button" class="close-btn" data-close="manualCopyDialog" aria-label="关闭">×</button></div><p class="dialog-lead">当前容器不允许自动写入剪贴板，请选择下方文本复制。</p><textarea id="manualCopyText" rows="9" readonly></textarea><div class="dialog-actions"><button class="primary-button" data-close="manualCopyDialog">完成</button></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

@@ -36,3 +36,8 @@
 .toast-undo:focus-visible{outline:2px solid currentColor}
 @media(max-width:420px){.toast{width:max-content;max-width:calc(100vw - 28px)}}
 .toast.visible{pointer-events:auto}
+
+/* v0.4 draft workspace — quiet, isolated from published library */
+.draft-quick{margin:0 0 14px}.draft-quick-button{display:flex;flex-direction:column;gap:5px;align-items:flex-start;text-align:left;padding:17px 20px;width:100%;border:1px dashed #bccdc1;border-radius:14px;background:var(--surface);color:var(--ink);font-weight:650;font-size:14px}.draft-quick-button small{font-size:11px;color:var(--muted);font-weight:400}.draft-quick-button:hover{background:var(--accent-soft);border-color:var(--accent)}
+.draft-save-status{font-size:12px;color:var(--muted);margin:5px 0 0}.draft-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:22px}.draft-actions-right{display:flex;gap:8px}.draft-body{min-height:220px!important}.draft-card .card-main{min-height:78px}.draft-card .card-title{font-weight:600}.draft-card .card-hint{color:var(--muted)}
+@media(max-width:420px){.draft-actions{align-items:stretch}.draft-actions-right{gap:5px}.draft-actions .primary-button{padding:0 10px}.draft-quick-button{padding:15px}}

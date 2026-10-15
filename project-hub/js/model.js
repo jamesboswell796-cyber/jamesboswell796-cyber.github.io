@@ -13,16 +13,19 @@ export function normalizeItem(input, existing = null) {
   if (!isObject(input)) throw new Error('记录必须为对象');
   const kind = input.kind ?? existing?.kind ?? 'prompt';
   if (!['project', 'prompt'].includes(kind)) throw new Error('记录类型必须为 project 或 prompt');
-  const title = safeText(input.title ?? existing?.title);
+  const status = input.status ?? existing?.status ?? 'published';
+  if (!['draft','published'].includes(status)) throw new Error('无效记录状态');
+  if (status === 'draft' && kind !== 'prompt') throw new Error('草稿仅支持普通提示词');
+  const title = safeText(input.title ?? existing?.title) || (status === 'draft' ? '未命名草稿' : '');
   if (!title || title.length > 160) throw new Error('标题需为 1–160 字');
   const body = String(input.body ?? existing?.body ?? '').trim();
-  if (kind === 'prompt' && !body) throw new Error('普通提示词的正文不能为空');
+  if (kind === 'prompt' && status === 'published' && !body) throw new Error('普通提示词的正文不能为空');
   if (body.length > 100000) throw new Error('正文过长（最多 100,000 字符）');
   const summary = safeText(input.summary ?? existing?.summary).slice(0, 400);
   const entry_url = linkAllowed(safeText(input.entry_url ?? existing?.entry_url));
   const current_url = linkAllowed(safeText(input.current_url ?? existing?.current_url));
   if (kind === 'project' && !entry_url) throw new Error('项目卡必须提供入口链接');
-  return { kind, title, body, summary, entry_url, current_url };
+  return { kind, title, body, summary, entry_url, current_url, status };
 }
 
 export function sortedItems(items, query = '', onlyStarred = false) {
@@ -81,6 +84,6 @@ export function parseBackup(raw) {
 }
 
 export function createBackup(items) {
-  const fields = ['id','title','kind','summary','body','entry_url','current_url','starred','pinned'];
-  return JSON.stringify({ schema_version:BACKUP_SCHEMA, exported_at:new Date().toISOString(), items:items.map(v => Object.fromEntries(fields.map(k=>[k,v[k] ?? (k==='starred'||k==='pinned' ? false : '')]))) },null,2)+'\n';
+  const fields = ['id','title','kind','summary','body','entry_url','current_url','starred','pinned','status'];
+  return JSON.stringify({ schema_version:BACKUP_SCHEMA, exported_at:new Date().toISOString(), items:items.map(v => Object.fromEntries(fields.map(k=>[k,v[k] ?? (k==='starred'||k==='pinned' ? false : k==='status'?'published' : '')]))) },null,2)+'\n';
 }

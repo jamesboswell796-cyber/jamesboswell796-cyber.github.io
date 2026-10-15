@@ -36,3 +36,9 @@
 - 个人数据在本地或配置后在 Supabase 的 per-user RLS 表内，不存入公开 GitHub Pages 文件。
 - 网站的源码可由有授权的 GitHub 工具修改；**修改仓库不等于修改私人提示词数据库**。未来的 Worker 直连 API 需单独有身份授权，仅允许小范围 get/update，并保留用户确认。
 - Supabase 并未在本仓库中配置：`config.js` 的 URL/公钥仍为空。配置前网站处于单浏览器本地模式；跨设备云同步、真实 RLS、MenuBarX/手机实际点击仍待验证。
+
+## v0.4 草稿说明
+
+- 已发布条目 `status=published`；随便写写为 `status=draft`，不出现在「全部/收藏」。旧备份缺少 status 时按 published 处理。
+- 草稿允许空正文和默认标题，晋级为正式提示词时必须明确标题且正文不为空。AI 修改草稿不能悄悄晋级。
+- 两套网站独立，Notion 版实验站不能依靠 GitHub Pages 直接调用 Notion 私人 API。
