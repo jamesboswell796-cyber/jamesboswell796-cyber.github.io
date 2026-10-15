@@ -1,5 +1,5 @@
 import {copyText} from './legacy/clipboard.js';
-import {normalizeItem,sortedItems,projectPrompt,parseBackup,createBackup} from './model.js';
+import {normalizeItem,sortedItems,projectPrompt,parseBackup,createBackup,parseBackupSettings} from './model.js';
 import {aiEditRequest,parseAIPatch,AI_DEFAULT_GUIDANCE} from './ai-protocol.js';
 import {LocalRepository,SupabaseRepository,generateId} from './repository.js';
 
@@ -212,19 +212,28 @@ async function applyAI(){
     aiPending=null;hide('aiDialog');
   }catch(err){notifyError(err);$('aiPreview').prepend(el('div','preview-item preview-error',`未应用任何修改：${err.message}`));}
 }
-function downloadBackup(){const json=createBackup(items),blob=new Blob([json],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`project-hub-backup-${new Date().toISOString().slice(0,10)}.json`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast(`✓ 已导出 ${items.length} 条记录`);}
+function downloadBackup(){const json=createBackup(items,{sourceApp:'supabase',aiGuidance:getAiGuidance()}),blob=new Blob([json],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`project-hub-supabase-${new Date().toISOString().slice(0,10)}.json`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast(`✓ 已导出 ${items.length} 条记录（含 AI 偏好）`);}
 async function readBackupFile(){const file=$('backupFile').files?.[0];if(!file)return;backupPending=null;$('backupPreview').replaceChildren();$('applyBackupBtn').hidden=true;
   try{if(file.size>4*1024*1024)throw Error('备份文件超过 4 MB，请拆分');
-    const result=parseBackup(await file.text());const byId=new Map(items.map(v=>[v.id,v]));const changed=result.map(item=>{
+    const raw=await file.text();const result=parseBackup(raw),metadata=parseBackupSettings(raw);
+    const guidance=metadata.ai_guidance!==null && metadata.ai_guidance!==getAiGuidance()?metadata.ai_guidance:null;
+    const byId=new Map(items.map(v=>[v.id,v]));const changed=result.map(item=>{
       const existing=byId.get(item.id)||null;
       // The backup owns content but leaves existing personal star/pin choices intact.
       const data={...normalizeItem(item),starred:existing?.starred ?? item.starred,pinned:existing?.pinned ?? item.pinned};
       const keys=['title','body','kind','summary','entry_url','current_url','starred','pinned','status'];
       return {item,existing,data,changed:keys.filter(k=>existing?.[k]!==data[k])};
     }).filter(v=>v.changed.length);
-    backupPending=changed;previewItems($('backupPreview'),changed,'backup');
-    $('backupPreview').prepend(el('div','preview-item',`共读取 ${result.length} 条；待新增或更新 ${changed.length} 条。仅合并，不会删除当前记录。`));
-    $('applyBackupBtn').hidden=changed.length===0;
+    backupPending={records:changed,guidance};previewItems($('backupPreview'),changed,'backup');
+    if(guidance!==null){
+      const row=el('div','preview-item');row.append(el('div','diff-title','AI 编辑偏好 · 待恢复'));
+      const fold=el('details','diff-expand');fold.append(el('summary','','展开比较原偏好和备份偏好'));
+      fold.append(el('div','before-after','原：'+getAiGuidance()),el('div','before-after after','新：'+guidance));
+      row.append(fold);$('backupPreview').append(row);
+    }
+    const origin=metadata.source_app==='supabase'?'Supabase 版':metadata.source_app==='notion'?'Notion 版':'';
+    $('backupPreview').prepend(el('div','preview-item',`共读取 ${result.length} 条；待合并 ${changed.length} 条${guidance!==null?'，AI 偏好将更新':''}。${origin?'来源：'+origin+'；':''}不会删除其他记录。`));
+    $('applyBackupBtn').hidden=changed.length===0 && guidance===null;
   }catch(err){$('backupPreview').replaceChildren(el('div','preview-item preview-error',err.message));}
   finally{$('backupFile').value='';}
 }
@@ -232,10 +241,14 @@ async function applyBackup(){
   if(!backupPending)return;
   $('applyBackupBtn').disabled=true;
   try{
-    const ops=backupPending.map(c=>({action:c.existing?'update':'create',id:c.existing?.id||c.item.id,
+    const pending=backupPending;
+    const ops=pending.records.map(c=>({action:c.existing?'update':'create',id:c.existing?.id||c.item.id,
       base_revision:c.existing?.revision,record:{...c.data}}));
-    await commitOperations(ops,`✓ 已整体合并 ${ops.length} 条备份`);
+    if(ops.length)await commitOperations(ops,`✓ 已合并 ${ops.length} 条记录`);
+    // Apply the preference only after record storage succeeds. Old backups leave it untouched.
+    if(pending.guidance!==null){localStorage.setItem(aiGuidanceKey,pending.guidance);$('aiGuidance').value=pending.guidance;}
     backupPending=null;$('backupPreview').replaceChildren();$('applyBackupBtn').hidden=true;
+    if(pending.guidance!==null)toast(ops.length?'✓ 已合并记录并恢复 AI 偏好':'✓ 已恢复 AI 编辑偏好');
   }catch(err){notifyError(err);$('backupPreview').prepend(el('div','preview-item preview-error',`未合并任何修改：${err.message}`));}
   finally{$('applyBackupBtn').disabled=false;}
 }

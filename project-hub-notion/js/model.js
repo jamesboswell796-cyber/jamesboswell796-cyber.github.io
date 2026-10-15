@@ -83,7 +83,27 @@ export function parseBackup(raw) {
   throw new Error('不支持的备份版本；支持 Project Hub schema_version: 1 和旧插件 schemaVersion: 1/2');
 }
 
-export function createBackup(items) {
+// Backup format remains schema_version:1; optional metadata is safe to ignore in older backups.
+export function createBackup(items, {sourceApp, aiGuidance} = {}) {
   const fields = ['id','title','kind','summary','body','entry_url','current_url','starred','pinned','status'];
-  return JSON.stringify({ schema_version:BACKUP_SCHEMA, exported_at:new Date().toISOString(), items:items.map(v => Object.fromEntries(fields.map(k=>[k,v[k] ?? (k==='starred'||k==='pinned' ? false : k==='status'?'published' : '')]))) },null,2)+'\n';
+  const backup = {schema_version:BACKUP_SCHEMA, exported_at:new Date().toISOString()};
+  if (sourceApp) backup.source_app=sourceApp;
+  if (typeof aiGuidance==='string' && aiGuidance.trim()) backup.preferences={ai_guidance:aiGuidance.trim()};
+  backup.items=items.map(v => Object.fromEntries(fields.map(k=>[k,v[k] ?? (k==='starred'||k==='pinned' ? false : k==='status'?'published' : '')])));
+  return JSON.stringify(backup,null,2)+'\n';
+}
+
+// Preference restoration is explicitly optional: old backups never reset local preferences.
+export function parseBackupSettings(raw) {
+  let data; try {data=JSON.parse(raw);} catch {throw new Error('备份不是有效 JSON');}
+  if (!isObject(data)) throw new Error('备份格式不正确');
+  const source_app=typeof data.source_app==='string'?data.source_app:null;
+  const settings=data.preferences;
+  if (settings===undefined) return {source_app,ai_guidance:null};
+  if (!isObject(settings)) throw new Error('备份的 AI 编辑偏好格式不正确');
+  const value=settings.ai_guidance;
+  if (value===undefined) return {source_app,ai_guidance:null};
+  if (typeof value!=='string' || !value.trim() || value.trim().length>1500)
+    throw new Error('备份的 AI 编辑偏好需为 1–1500 字');
+  return {source_app,ai_guidance:value.trim()};
 }
