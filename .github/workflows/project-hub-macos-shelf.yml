@@ -17,3 +17,13 @@ jobs:
       - name: Compile macOS Shelf
         working-directory: project-hub-mac
         run: swift build -c debug
+      - name: Package preview app
+        working-directory: project-hub-mac
+        run: bash scripts/package-app.sh
+      - name: Upload Mac preview ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProjectHubShelf-macOS-arm64-preview
+          path: project-hub-mac/dist/ProjectHubShelf-macOS-arm64.zip
+          if-no-files-found: error
+          retention-days: 14
