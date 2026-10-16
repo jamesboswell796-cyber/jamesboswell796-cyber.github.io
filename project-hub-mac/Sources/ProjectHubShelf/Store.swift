@@ -31,7 +31,7 @@ struct LocalNote: Codable, Identifiable {
     var id: String = UUID().uuidString
     var text: String = ""
     var title: String {
-        String(text.split(separator: "\n").first ?? "未命名灵感").prefix(40)
+        String(String(text.split(separator: "\n").first ?? "未命名灵感").prefix(40))
     }
 }
 
