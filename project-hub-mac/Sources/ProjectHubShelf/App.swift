@@ -87,7 +87,7 @@ final class ShelfAppDelegate: NSObject, NSApplicationDelegate {
             return noErr
         }
         InstallEventHandler(GetApplicationEventTarget(), callback, 1, &eventType, nil, &hotKeyHandler)
-        var identifier = EventHotKeyID(signature: OSType(0x50485346), id: 1) // PHSF
+        let identifier = EventHotKeyID(signature: OSType(0x50485346), id: 1) // PHSF
         RegisterEventHotKey(
             UInt32(kVK_ANSI_V), UInt32(controlKey) | UInt32(optionKey),
             identifier, GetApplicationEventTarget(), 0, &hotKey
