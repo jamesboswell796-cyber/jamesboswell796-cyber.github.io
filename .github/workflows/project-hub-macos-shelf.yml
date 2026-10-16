@@ -1,0 +1,19 @@
+name: Project Hub macOS Shelf build
+
+on:
+  pull_request:
+    paths:
+      - 'project-hub-mac/**'
+      - '.github/workflows/project-hub-macos-shelf.yml'
+  workflow_dispatch:
+
+jobs:
+  swift-build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: swift --version
+      - name: Compile macOS Shelf
+        working-directory: project-hub-mac
+        run: swift build -c debug
