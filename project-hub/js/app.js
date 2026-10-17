@@ -1,7 +1,7 @@
 import {copyText} from './legacy/clipboard.js';
 import {normalizeItem,sortedItems,projectPrompt,parseBackup,createBackup,parseBackupSettings} from './model.js';
 import {aiEditRequest,parseAIPatch,AI_DEFAULT_GUIDANCE} from './ai-protocol.js';
-import {LocalRepository,SupabaseRepository,generateId,parseRecoveryFragment} from './repository.js';
+import {LocalRepository,SupabaseRepository,generateId,parseRecoveryFragment} from './repository.js?v=auth-reset-20261018-1';
 import {assemblePrompt,encodeRecipe,decodeRecipe,normalizeRecipe} from './composer.js';
 
 const $=id=>document.getElementById(id);
