@@ -41,3 +41,15 @@
 .draft-quick{margin:0 0 14px}.draft-quick-button{display:flex;flex-direction:column;gap:5px;align-items:flex-start;text-align:left;padding:17px 20px;width:100%;border:1px dashed #bccdc1;border-radius:14px;background:var(--surface);color:var(--ink);font-weight:650;font-size:14px}.draft-quick-button small{font-size:11px;color:var(--muted);font-weight:400}.draft-quick-button:hover{background:var(--accent-soft);border-color:var(--accent)}
 .draft-save-status{font-size:12px;color:var(--muted);margin:5px 0 0}.draft-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:22px}.draft-actions-right{display:flex;gap:8px}.draft-body{min-height:220px!important}.draft-card .card-main{min-height:78px}.draft-card .card-title{font-weight:600}.draft-card .card-hint{color:var(--muted)}
 @media(max-width:420px){.draft-actions{align-items:stretch}.draft-actions-right{gap:5px}.draft-actions .primary-button{padding:0 10px}.draft-quick-button{padding:15px}}
+
+/* v0.5 prompt composer: modest space, scrollable on narrow MenuBarX/iPhone */
+.work-actions{display:flex;align-items:center;gap:13px}.compose-dialog{width:min(94vw,740px)}
+.compose-grid{display:grid;grid-template-columns:1fr 1.2fr;gap:14px}
+.compose-dialog select,.compose-note{width:100%;padding:10px 11px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;min-width:0;font:inherit}
+.compose-source-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:-7px;margin-bottom:12px}
+.compose-selected{display:grid;gap:8px;margin-bottom:16px}.compose-reference{border:1px solid var(--line);border-radius:11px;padding:7px 10px;background:var(--bg)}.compose-ref-header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:5px}.compose-ref-header strong{font-size:12px;overflow-wrap:anywhere}.compose-note{border-color:transparent;background:var(--surface);font-size:12px}
+.compose-output-head{display:flex;justify-content:space-between;gap:10px;font-size:12px;margin:16px 0 7px}.compose-output-head span{color:var(--muted);overflow-wrap:anywhere}.compose-output{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:13px;min-height:110px;max-height:210px;overflow:auto;margin:0}.tool-compose{font-size:11px;font-weight:650;min-width:45px}
+@media(max-width:720px){.compose-grid{grid-template-columns:1fr}.compose-dialog{padding:19px}.work-actions{gap:4px}.work-actions .text-action{font-size:11px}.compose-actions{flex-wrap:wrap}.compose-actions button{flex:1}}
+@media(max-width:390px){.filter-tabs{gap:11px}.work-actions .text-action{padding-left:1px;padding-right:1px;font-size:10px}}
+
+@media(max-width:520px){.filterbar{flex-wrap:wrap;align-items:flex-end;row-gap:2px}.filter-tabs{width:100%;justify-content:flex-start}.work-actions{margin-left:auto}.work-actions .text-action{padding-bottom:10px}}

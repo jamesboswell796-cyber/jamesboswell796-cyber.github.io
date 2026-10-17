@@ -1,0 +1,31 @@
+// Node.js 18+: node tests/composer-test.mjs
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const js=readFileSync(new URL('../js/composer.js',import.meta.url),'utf8');
+const {assemblePrompt,normalizeRecipe,decodeRecipe,encodeRecipe}=await import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'));
+const p={id:'p1',title:'数学题核验',kind:'project',status:'published',entry_url:'https://drive.google.com/file/d/alpha/view',current_url:'https://drive.google.com/file/d/beta/view'};
+const k={id:'k1',title:'K002 · 原题裁切',kind:'project',status:'published',entry_url:'https://drive.google.com/file/d/gamma/view'};
+const q={id:'p2',title:'题库项目',kind:'project',status:'published',entry_url:'https://drive.google.com/file/d/delta/view'};
+const rows=[p,k,q];let count=0;
+function check(name,test){assert.ok(test,name);count++;console.log('PASS',name);}
+const temporary=assemblePrompt({mode:'temporary',mainId:'p1',task:'给出两条建议',sources:[]},rows);
+check('临时调用不误接管',temporary.includes('不正式接手')&&!temporary.includes('请等待我'));
+const noTask=assemblePrompt({mode:'temporary',mainId:'p1',task:'',sources:[]},rows);
+check('没有任务则等待',noTask.includes('等待我补充'));
+const handoff=assemblePrompt({mode:'handoff',mainId:'p1',task:'从已授权 Next 继续',sources:[]},rows);
+check('接手包含权威 Current',handoff.includes(p.current_url)&&handoff.includes('唯一权威'));
+const composed=assemblePrompt({mode:'compose',mainId:'p1',task:'制作练习',sources:[{id:'p2',role:'reference',note:'目录方式'},{id:'k1',role:'method',note:'完整题目裁切'}]},rows);
+check('主项目加定向参考',composed.includes('主设计')&&composed.includes('目录方式')&&composed.includes('完整题目裁切'));
+check('参考按输入顺序分组',composed.indexOf('题库项目')<composed.indexOf('K002'));
+const spec={mode:'compose',mainId:'p1',sources:[{id:'k1',role:'method',note:''}],task:'任务'};
+const restored=decodeRecipe(encodeRecipe(spec));
+check('动态收藏 roundtrip',JSON.stringify(restored)===JSON.stringify(spec));
+check('普通提示词不是组合',decodeRecipe('正常提示词')===null);
+const duplicate=normalizeRecipe({mode:'compose',mainId:'p1',sources:[{id:'p1',role:'reference'},{id:'k1',role:'method'},{id:'k1',role:'reference'}],task:''});
+check('删除重复和主项目引用',duplicate.sources.length===1);
+assert.throws(()=>assemblePrompt({mode:'compose',mainId:'missing',sources:[]},rows),/缺少入口/);check('失效主项目拒绝',true);
+assert.throws(()=>assemblePrompt(spec,[p,q]),/已删除/);check('失效方法拒绝',true);
+assert.throws(()=>normalizeRecipe({mode:'bad',mainId:'p1'}),/用途/);check('错误用途拒绝',true);
+assert.throws(()=>normalizeRecipe({mode:'compose',mainId:'p1',task:'x'.repeat(5001)}),/5000/);check('任务长度限制',true);
+check('引用的只是入口而不是完整 SOP',!composed.includes('逐条读取全部历史'));
+console.log('composer tests:',count,'/ 13');

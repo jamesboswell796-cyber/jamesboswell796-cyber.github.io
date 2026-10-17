@@ -2,6 +2,7 @@ import {copyText} from './legacy/clipboard.js';
 import {normalizeItem,sortedItems,projectPrompt,parseBackup,createBackup,parseBackupSettings} from './model.js';
 import {aiEditRequest,parseAIPatch,AI_DEFAULT_GUIDANCE} from './ai-protocol.js';
 import {LocalRepository,SupabaseRepository,generateId} from './repository.js';
+import {assemblePrompt,encodeRecipe,decodeRecipe,normalizeRecipe} from './composer.js';
 
 const $=id=>document.getElementById(id);
 const config=window.PROJECT_HUB_CONFIG||{};
@@ -9,6 +10,7 @@ const cloud=Boolean(config.supabaseUrl && config.supabaseAnonKey);
 const repo=cloud ? new SupabaseRepository(config) : new LocalRepository();
 let items=[], editing=null, activeFilter='all', aiPending=null, backupPending=null, saving=false, toastTimer=null, previewTimer=null;
 let activeDraftId=null, draftTimer=null, draftFlushPromise=null;
+let composeSources=[], composeEditing=null;
 const undoStack=[];
 const themeKey='project-hub-theme';
 const aiGuidanceKey='project-hub-ai-guidance-v1';
@@ -20,7 +22,7 @@ function toast(message, undo=false){
   area.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>area.classList.remove('visible'),undo?9500:3300);
 }
 function updateUndoButton(){const button=$('undoSettingsBtn');if(button)button.disabled=!undoStack.length;}
-function snapshot(row){return row ? {kind:row.kind,title:row.title,body:row.body,summary:row.summary,entry_url:row.entry_url,current_url:row.current_url,starred:row.starred,pinned:row.pinned} : null;}
+function snapshot(row){return row ? {kind:row.kind,title:row.title,body:row.body,summary:row.summary,entry_url:row.entry_url,current_url:row.current_url,starred:row.starred,pinned:row.pinned,status:row.status||'published'} : null;}
 async function commitOperations(ops,message,{trackUndo=true}={}){
   if(saving)throw Error('有操作正在保存，请完成后再试');
   saving=true;
@@ -93,22 +95,27 @@ function closeMenus(){ document.querySelectorAll('.card-menu[open]').forEach(men
 function card(item){
   const article=el('article','prompt-card'); article.dataset.id=item.id;
   const isDraft=item.status==='draft';
+  const isRecipe=!isDraft&&typeof item.body==='string'&&item.body.startsWith('PROJECT_HUB_RECIPE_V1:');
   if(isDraft)article.classList.add('draft-card');
-  const main=btn('card-main',isDraft?'继续写草稿':`复制${item.kind==='project'?'临时调用词':'提示词'}：${item.title}`,'',()=>isDraft?openDraft(item):copyItem(item));
+  const main=btn('card-main',isDraft?'继续写草稿':`复制${isRecipe?'动态组合':item.kind==='project'?'临时调用词':'提示词'}：${item.title}`,'',()=>isDraft?openDraft(item):copyItem(item));
   if(item.pinned) main.append(el('span','pinned-label','📌 置顶'));
-  main.append(el('div','card-title',item.title),el('div','card-summary',isDraft?(item.body.slice(0,90)||'还没有内容，点击继续写'):item.summary|| (item.kind==='project'?'点击复制项目临时调用词':'点击复制提示词')));
+  main.append(el('div','card-title',item.title),el('div','card-summary',isDraft?(item.body.slice(0,90)||'还没有内容，点击继续写'):item.summary|| (isRecipe?'引用当前项目记录，点击生成并复制':item.kind==='project'?'点击复制项目临时调用词':'点击复制提示词')));
   const bottom=el('div','card-bottom');
-  bottom.append(el('span','card-hint',isDraft?'✎ 草稿 · 点击继续写':item.kind==='project'?'◇ 项目入口':'轻点卡片复制'));
+  bottom.append(el('span','card-hint',isDraft?'✎ 草稿 · 点击继续写':isRecipe?'◇ 动态组合':item.kind==='project'?'◇ 项目入口':'轻点卡片复制'));
   const tools=el('div','card-tools');
   if(!isDraft)tools.append(btn(`tool${item.starred?' star-active':''}`,item.starred?'取消收藏':'加入收藏',item.starred?'★':'☆',()=>changeFlag(item,'starred')));
-  tools.append(btn('tool tool-ai','复制给 AI 修改','✧ AI',()=>copyForAI(item)));
-  if(item.kind==='project')tools.append(btn('tool handoff','复制正式接手 Worker 提示词','接手',()=>copyItem(item,'handoff')));
+  if(!isRecipe)tools.append(btn('tool tool-ai','复制给 AI 修改','✧ AI',()=>copyForAI(item)));
+  if(item.kind==='project'){
+    tools.append(btn('tool tool-compose','添加到提示词组装','组装',()=>openCompose(item)));
+    tools.append(btn('tool handoff','复制正式接手 Worker 提示词','接手',()=>copyItem(item,'handoff')));
+  }
   const menu=el('details','card-menu');
   const summary=el('summary','tool menu-trigger','···');summary.title='更多操作';summary.setAttribute('aria-label','更多操作');
   summary.addEventListener('click',e=>{e.stopPropagation();const wasOpen=menu.open;closeMenus(); if(wasOpen)menu.open=true;});
   const options=el('div','menu-popover');
   const opt=(name,label,run)=>options.append(btn('menu-option',name,label,()=>{menu.open=false;run();}));
-  opt('编辑','✎ 编辑',()=>isDraft?openDraft(item):openEdit(item));
+  opt('编辑',isRecipe?'✎ 编辑组合':'✎ 编辑',()=>isDraft?openDraft(item):isRecipe?openCompose(null,item):openEdit(item));
+  if(isRecipe)opt('删除','删除这个组合',()=>deleteRecipe(item));
   opt('置顶',item.pinned?'取消置顶':'📌 置顶',()=>changeFlag(item,'pinned'));
   if(item.kind==='project')opt('打开项目入口','↗ 打开入口',()=>window.open(item.entry_url,'_blank','noopener,noreferrer'));
   menu.append(summary,options);tools.append(menu);
@@ -134,9 +141,87 @@ async function write(record, original=null, label='✓ 已保存'){
 }
 async function changeFlag(item,key){try{await write({...item,[key]:!item[key]},item,key==='starred'?'收藏已更新':'置顶已更新');}catch(err){notifyError(err);}}
 async function copyItem(item,mode='temporary'){
-  const content=projectPrompt(item,mode);
+  let content;
+  try{const recipe=decodeRecipe(item.body);content=recipe?assemblePrompt(recipe,items):projectPrompt(item,mode);}
+  catch(err){notifyError(err);return;}
   try{await copyText(content);toast(mode==='handoff'?'✓ 已复制正式接手词':'✓ 已复制到剪贴板');}
   catch{ $('manualCopyText').value=content;show('manualCopyDialog');$('manualCopyText').select(); }
+}
+function liveProjects(){return items.filter(row=>row.kind==='project'&&row.status!=='draft'&&row.entry_url);}
+function projectOption(row){const option=document.createElement('option');option.value=row.id;option.textContent=row.title;return option;}
+function openCompose(main=null,saved=null){
+  try{
+    composeEditing=saved;const loaded=saved?decodeRecipe(saved.body):null;
+    composeSources=loaded?.sources?.map(s=>({...s}))||[];
+    const projects=liveProjects();
+    $('composeMain').replaceChildren(el('option','','请选择主项目'),...projects.map(projectOption));
+    $('composeMain').firstChild.value='';
+    $('composeMain').value=loaded?.mainId||main?.id||'';
+    $('composeMode').value=loaded?.mode||'temporary';
+    $('composeTask').value=loaded?.task||'';
+    show('composeDialog');updateCompose();
+  }catch(err){notifyError(err);}
+}
+function composeData(){
+  return normalizeRecipe({mode:$('composeMode').value,mainId:$('composeMain').value,
+    task:$('composeTask').value,sources:composeSources});
+}
+function updateCompose(){
+  const selected=$('composeMain').value;
+  const all=liveProjects(),occupied=new Set([selected,...composeSources.map(s=>s.id)]);
+  const previous=$('composeSource').value;
+  const choose=el('option','','选择一项参考');choose.value='';
+  $('composeSource').replaceChildren(choose,...all.filter(x=>!occupied.has(x.id)).map(projectOption));
+  $('composeSource').value=occupied.has(previous)?'':previous;
+  const chosen=$('composeChosen');chosen.replaceChildren();
+  for(const [i,s] of composeSources.entries()){
+    const row=items.find(x=>x.id===s.id);
+    const box=el('div','compose-reference');
+    const header=el('div','compose-ref-header');
+    header.append(el('strong','',(s.role==='method'?'方法 · ':'参考 · ')+(row?.title||'原引用已失效')));
+    const remove=btn('tool','移除参考','×',()=>{composeSources.splice(i,1);updateCompose();});
+    header.append(remove);box.append(header);
+    const note=el('input','compose-note');note.placeholder=s.role==='method'?'具体应用在哪一步（可选）':'具体借鉴什么（可选）';
+    note.maxLength=400;note.value=s.note||'';note.setAttribute('aria-label','借鉴点：'+(row?.title||s.id));
+    note.addEventListener('input',()=>{s.note=note.value;refreshComposePreview();});
+    box.append(note);chosen.append(box);
+  }
+  refreshComposePreview();
+}
+function refreshComposePreview(){
+  try{const spec=composeData();const result=assemblePrompt(spec,items);
+    $('composeOutput').textContent=result;$('composeStatus').textContent='✓ 即时预览';
+    $('composeCopyBtn').disabled=false;$('composeSaveBtn').disabled=false;
+  }catch(err){$('composeOutput').textContent='请先完成选择。';$('composeStatus').textContent=err.message;
+    $('composeCopyBtn').disabled=true;$('composeSaveBtn').disabled=true;}
+}
+function addComposeSource(role){
+  const id=$('composeSource').value;
+  if(!id){toast('先选择一个项目或 KH 方法入口');return;}
+  composeSources.push({id,role,note:''});updateCompose();
+}
+async function copyComposed(){
+  let value;
+  try{value=assemblePrompt(composeData(),items);}catch(err){notifyError(err);return;}
+  try{await copyText(value);toast('✓ 已复制完整提示词');}
+  catch{$('manualCopyText').value=value;show('manualCopyDialog');$('manualCopyText').select();}
+}
+async function saveComposed(){
+  try{const spec=composeData();assemblePrompt(spec,items);
+    const main=items.find(x=>x.id===spec.mainId);
+    const defaultName=composeEditing?.title||'组合 · '+main.title;
+    const label=window.prompt('为常用组合起个名字',defaultName);
+    if(label===null)return;
+    if(!label.trim()){toast('请输入组合名称');return;}
+    const record=normalizeItem({kind:'prompt',title:label.trim(),summary:'动态组合：引用当前项目与方法入口',body:encodeRecipe(spec),status:'published'});
+    const result=await write({...record,starred:true,pinned:Boolean(composeEditing?.pinned)},composeEditing,'✓ 常用组合已保存');
+    composeEditing=result;toast('✓ 已保存到正式词库 · 收藏');render();
+  }catch(err){notifyError(err);}
+}
+async function deleteRecipe(row){
+  if(!confirm('确定删除这个收藏组合吗？被引用的项目和方法不会删除。'))return;
+  try{await commitOperations([{action:'delete',id:row.id,base_revision:row.revision}],'组合已删除');}
+  catch(err){notifyError(err);}
 }
 function setKind(kind){const isProject=kind==='project';$('projectFields').hidden=!isProject;$('bodyLabel').textContent=isProject?'调用补充说明（可选）':'提示词正文';$('bodyHelp').textContent=isProject?'主卡片复制临时调用词；「接手」按钮复制正式接手词。':'点击卡片主体即可一键复制。';$('editBody').required=!isProject;$('editEntry').required=isProject;}
 function openEdit(item=null){
@@ -337,6 +422,15 @@ $('promoteDraftBtn').addEventListener('click',promoteDraft);
 $('draftDialog').addEventListener('cancel',event=>{event.preventDefault();closeDraft();});
 $('draftDialog').addEventListener('click',event=>{if(event.target===$('draftDialog'))closeDraft();});
 
+$('composeBtn').addEventListener('click',()=>openCompose());
+$('composeMode').addEventListener('change',refreshComposePreview);
+$('composeMain').addEventListener('change',updateCompose);
+$('composeSource').addEventListener('change',()=>{});
+$('composeTask').addEventListener('input',refreshComposePreview);
+$('addReferenceBtn').addEventListener('click',()=>addComposeSource('reference'));
+$('addMethodBtn').addEventListener('click',()=>addComposeSource('method'));
+$('composeCopyBtn').addEventListener('click',copyComposed);
+$('composeSaveBtn').addEventListener('click',saveComposed);
 $('search').addEventListener('input',render);
 $('newBtn').addEventListener('click',()=>openEdit());$('emptyNew').addEventListener('click',()=>openEdit());
 $('allFilter').addEventListener('click',()=>{activeFilter='all';render();});
