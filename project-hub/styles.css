@@ -53,3 +53,5 @@
 @media(max-width:390px){.filter-tabs{gap:11px}.work-actions .text-action{padding-left:1px;padding-right:1px;font-size:10px}}
 
 @media(max-width:520px){.filterbar{flex-wrap:wrap;align-items:flex-end;row-gap:2px}.filter-tabs{width:100%;justify-content:flex-start}.work-actions{margin-left:auto}.work-actions .text-action{padding-bottom:10px}}
+
+.auth-link{border:0;background:transparent;color:#527b63;padding:2px 0;font-size:12px;font-weight:650}.auth-link:hover{text-decoration:underline}.auth-status{font-size:12px;line-height:1.7;color:var(--muted);margin:-5px 0 12px}.auth-status:empty{display:none}

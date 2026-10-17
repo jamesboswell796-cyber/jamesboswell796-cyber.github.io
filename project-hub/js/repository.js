@@ -22,6 +22,17 @@ const checkOps = ops => {
 };
 const recordFields = o => Object.fromEntries(['kind','title','summary','body','entry_url','current_url','starred','pinned','status'].map(k=>[k,o[k]]));
 
+export function parseRecoveryFragment(fragment){
+  const raw=String(fragment||'').replace(/^#/,'');
+  if(!raw)return null;
+  const params=new URLSearchParams(raw);
+  if(params.has('error'))return {error:params.get('error_description')||params.get('error_code')||params.get('error')};
+  if(params.get('type')!=='recovery')return null;
+  const accessToken=params.get('access_token');
+  if(!accessToken)return {error:'重置链接无效或已过期，请重新申请。'};
+  return {accessToken};
+}
+
 export class LocalRepository {
   async list(){ return JSON.parse(localStorage.getItem(KEY)||'[]'); }
   async applyBatch(ops){
@@ -70,6 +81,16 @@ export class SupabaseRepository {
     const result=await this.request('/auth/v1/token?grant_type=password',{method:'POST',body:{email,password},token:null});
     this.auth={...result,expires_at:result.expires_at||Math.floor(Date.now()/1000)+(result.expires_in||3600)};
     localStorage.setItem(SESSION_KEY,JSON.stringify(this.auth));return this.auth;
+  }
+  async requestPasswordRecovery(email,redirectTo){
+    if(!email?.trim())throw Error('请输入邮箱');
+    const query=new URLSearchParams({redirect_to:redirectTo});
+    return this.request(`/auth/v1/recover?${query}`,{method:'POST',body:{email:email.trim()},token:null});
+  }
+  async updatePassword(password,accessToken){
+    if(!accessToken)throw Error('重置链接无效或已过期，请重新申请');
+    if(!password)throw Error('请输入新密码');
+    return this.request('/auth/v1/user',{method:'PUT',body:{password},token:accessToken});
   }
   logout(){this.auth=null;localStorage.removeItem(SESSION_KEY);}
   async ensureAuth(){

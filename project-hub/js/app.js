@@ -1,13 +1,18 @@
 import {copyText} from './legacy/clipboard.js';
 import {normalizeItem,sortedItems,projectPrompt,parseBackup,createBackup,parseBackupSettings} from './model.js';
 import {aiEditRequest,parseAIPatch,AI_DEFAULT_GUIDANCE} from './ai-protocol.js';
-import {LocalRepository,SupabaseRepository,generateId} from './repository.js';
+import {LocalRepository,SupabaseRepository,generateId,parseRecoveryFragment} from './repository.js';
 import {assemblePrompt,encodeRecipe,decodeRecipe,normalizeRecipe} from './composer.js';
 
 const $=id=>document.getElementById(id);
 const config=window.PROJECT_HUB_CONFIG||{};
 const cloud=Boolean(config.supabaseUrl && config.supabaseAnonKey);
 const repo=cloud ? new SupabaseRepository(config) : new LocalRepository();
+let recoveryLink=cloud ? parseRecoveryFragment(window.location.hash) : null;
+const hasRecoveryLink=Boolean(recoveryLink);
+let recoveryAccessToken=recoveryLink?.accessToken||null;
+const recoveryError=recoveryLink?.error||'';
+if(hasRecoveryLink){window.history.replaceState(null,'',window.location.pathname+window.location.search);recoveryLink=null;}
 let items=[], editing=null, activeFilter='all', aiPending=null, backupPending=null, saving=false, toastTimer=null, previewTimer=null;
 let activeDraftId=null, draftTimer=null, draftFlushPromise=null;
 let composeSources=[], composeEditing=null;
@@ -342,6 +347,34 @@ async function login(e){e.preventDefault();try{
   const loaded=await reload();
   if(loaded){hide('authDialog');toast('✓ 云端同步已连接');}
 }catch(err){notifyError(err);}}
+function showAuthPanel(name){
+  $('loginPanel').hidden=name!=='login';
+  $('resetRequestPanel').hidden=name!=='request';
+  $('passwordRecoveryPanel').hidden=name!=='change';
+}
+async function requestPasswordRecovery(e){
+  e.preventDefault();const button=$('sendResetBtn');button.disabled=true;$('resetRequestStatus').textContent='';
+  try{
+    const redirectTo=new URL('./',window.location.href).href;
+    await repo.requestPasswordRecovery($('resetEmail').value,redirectTo);
+    $('resetRequestStatus').textContent='如果该邮箱已注册，重设密码邮件就会发出。请检查收件箱和垃圾邮件。';
+  }catch(err){$('resetRequestStatus').textContent=err.message;}
+  finally{button.disabled=false;}
+}
+async function saveRecoveredPassword(e){
+  e.preventDefault();const status=$('passwordRecoveryStatus');status.textContent='';
+  const password=$('newPassword').value,confirmation=$('confirmNewPassword').value;
+  if(!recoveryAccessToken){status.textContent='这个重设链接无效或已过期。请返回登录页重新申请。';return;}
+  if(password!==confirmation){status.textContent='两次输入的新密码不一致，请重新输入。';$('confirmNewPassword').focus();return;}
+  const button=$('saveNewPasswordBtn');button.disabled=true;
+  try{
+    await repo.updatePassword(password,recoveryAccessToken);
+    recoveryAccessToken=null;$('newPassword').value='';$('confirmNewPassword').value='';
+    $('email').value=$('resetEmail').value||$('email').value;
+    showAuthPanel('login');toast('✓ 新密码已保存，请用新密码登录');
+  }catch(err){status.textContent=err.message;}
+  finally{button.disabled=!recoveryAccessToken;}
+}
 
 // A draft is an ordinary record with status=draft. Drafts never appear in the published list.
 // The editor queues writes and flushes before closing, so autosave cannot overwrite a later edit.
@@ -450,8 +483,17 @@ $('exportBtn').addEventListener('click',downloadBackup);$('importBtn').addEventL
 $('refreshBtn').addEventListener('click',async()=>{if(await reload())toast('列表已刷新');});
 $('logoutBtn').addEventListener('click',()=>{repo.logout();items=[];undoStack.length=0;updateUndoButton();render();hide('settingsDialog');show('authDialog');});
 $('authForm').addEventListener('submit',login);
+$('forgotPasswordBtn').addEventListener('click',()=>{$('resetEmail').value=$('email').value;$('resetRequestStatus').textContent='';showAuthPanel('request');$('resetEmail').focus();});
+$('backToLoginBtn').addEventListener('click',()=>showAuthPanel('login'));
+$('resetRequestForm').addEventListener('submit',requestPasswordRecovery);
+$('passwordRecoveryForm').addEventListener('submit',saveRecoveredPassword);
+$('recoveryBackBtn').addEventListener('click',()=>showAuthPanel('login'));
 for(const b of document.querySelectorAll('[data-close]'))b.addEventListener('click',()=>hide(b.dataset.close));
 for(const d of document.querySelectorAll('dialog:not(#authDialog)'))d.addEventListener('click',e=>{if(e.target===d)d.close();});
 window.addEventListener('keydown',e=>{if(e.key==='/'&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)&&!document.querySelector('dialog[open]')){e.preventDefault();$('search').focus();}});
 updateStatus();updateUndoButton();
-if(cloud && !repo.signedIn)show('authDialog');else reload();
+if(cloud && hasRecoveryLink){
+  show('authDialog');showAuthPanel('change');
+  $('passwordRecoveryStatus').textContent=recoveryError;
+  $('saveNewPasswordBtn').disabled=!recoveryAccessToken;
+}else if(cloud && !repo.signedIn)show('authDialog');else reload();
