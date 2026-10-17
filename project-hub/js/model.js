@@ -58,7 +58,7 @@ export function projectPrompt(item, mode = 'temporary') {
 }
 
 export function parseBackup(raw) {
-  let data; try { data = JSON.parse(raw); } catch { throw new Error('备份不是有效 JSON'); }
+  let data; try { data = JSON.parse(String(raw).trim()); } catch { throw new Error('备份不是有效 JSON'); }
   if (isObject(data) && data.schema_version === BACKUP_SCHEMA && Array.isArray(data.items)) {
     if (data.items.length > 2000) throw new Error('单次备份最多 2000 条');
     const ids = new Set();
@@ -95,7 +95,7 @@ export function createBackup(items, {sourceApp, aiGuidance} = {}) {
 
 // Preference restoration is explicitly optional: old backups never reset local preferences.
 export function parseBackupSettings(raw) {
-  let data; try {data=JSON.parse(raw);} catch {throw new Error('备份不是有效 JSON');}
+  let data; try {data=JSON.parse(String(raw).trim());} catch {throw new Error('备份不是有效 JSON');}
   if (!isObject(data)) throw new Error('备份格式不正确');
   const source_app=typeof data.source_app==='string'?data.source_app:null;
   const settings=data.preferences;
